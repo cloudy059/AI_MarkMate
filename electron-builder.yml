@@ -1,0 +1,28 @@
+appId: com.aigrading.sidebar
+productName: AI自动阅卷助手
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - "!**/*.map"
+asarUnpack:
+  - "**/node_modules/@nut-tree-fork/**"
+win:
+  target:
+    - nsis
+  icon: resources/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: AI自动阅卷助手
+mac:
+  target:
+    - dmg
+  category: public.app-category.education
+  icon: resources/icon.png
+  extendInfo:
+    NSAppleEventsUsageDescription: 用于自动点击分值输入框与提交按钮，完成自动阅卷提交。

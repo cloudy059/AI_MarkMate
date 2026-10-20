@@ -1,0 +1,41 @@
+{
+  "name": "ai-grading-assistant",
+  "productName": "AI自动阅卷助手",
+  "version": "1.1.0",
+  "description": "AI自动阅卷桌面侧边栏助手 —— 悬浮侧边栏形式的智能阅卷打分工具",
+  "main": "out/main/index.js",
+  "author": "AI Grading Assistant",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "build:win": "electron-vite build && electron-builder --win",
+    "build:mac": "electron-vite build && electron-builder --mac"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "4.2.6"
+  },
+  "devDependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "antd": "^6.6.6",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "katex": "^0.16.22",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
+    "typescript": "~5.9.0",
+    "vite": "^7.1.0",
+    "zustand": "^5.0.15"
+  }
+}

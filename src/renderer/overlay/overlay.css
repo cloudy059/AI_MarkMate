@@ -1,0 +1,158 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.overlay-root {
+  position: fixed;
+  inset: 0;
+}
+
+.hint-bar {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px 18px;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  max-width: 80vw;
+  text-align: center;
+}
+
+.hint-bar .kbd {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 2px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.sel-box {
+  position: fixed;
+  z-index: 50;
+  border: 2px solid #1677ff;
+  background: rgba(22, 119, 255, 0.12);
+  box-shadow: 0 0 0 100000px rgba(0, 16, 32, 0.3);
+}
+
+.sel-size {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  white-space: nowrap;
+  background: #1677ff;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.point-ghost {
+  position: fixed;
+  z-index: 50;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid #1677ff;
+  border-radius: 50%;
+  background: rgba(22, 119, 255, 0.25);
+  pointer-events: none;
+}
+
+/* ---------- 定位框手动调整层 ---------- */
+.adj-box {
+  position: fixed;
+  z-index: 60;
+  border: 2px solid #1677ff;
+  border-radius: 4px;
+  cursor: move;
+  box-shadow: 0 0 0 100000px rgba(0, 16, 32, 0.25);
+}
+
+.adj-label {
+  position: absolute;
+  top: -24px;
+  left: -2px;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+.adj-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.adj-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+}
+
+.adj-nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.adj-n  { left: 50%; margin-left: -5px; top: -6px; cursor: ns-resize; }
+.adj-ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.adj-e  { right: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+.adj-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.adj-s  { left: 50%; margin-left: -5px; bottom: -6px; cursor: ns-resize; }
+.adj-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.adj-w  { left: -6px; top: 50%; margin-top: -5px; cursor: ew-resize; }
+
+.adj-bar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  gap: 10px;
+}
+
+.adj-btn {
+  font-size: 14px;
+  padding: 8px 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.adj-btn.primary {
+  background: #1677ff;
+  color: #fff;
+  border-color: #1677ff;
+}
+
+.adj-btn.ghost {
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+}
