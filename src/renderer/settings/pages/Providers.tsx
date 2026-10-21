@@ -116,7 +116,7 @@ export default function ProvidersPage() {
             const t = testResult?.id === p.id ? testResult.r : null
             return (
               <List.Item style={{ display: 'block', padding: '5px 0' }}>
-                {/* 第一行：开关 + 名称 + 状态标签 */}
+                {/* 单行：开关 + 名称 + 状态标签 + 操作按钮（右侧） */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
                   <Switch
                     checked={p.enabled}
@@ -126,21 +126,20 @@ export default function ProvidersPage() {
                   <Tag color={info.local ? 'geekblue' : 'blue'}>{info.local ? '本机' : '云端'}</Tag>
                   {!keyReady && p.enabled && <Tag color="warning">未填密钥</Tag>}
                   {t && (t.ok ? <Tag color="success" icon={<CheckCircleOutlined />}>{t.latencyMs}ms</Tag> : <Tag color="error" icon={<CloseCircleOutlined />}>失败</Tag>)}
+                  <Space size={6} style={{ marginLeft: 'auto' }}>
+                    <Button
+                      size="small"
+                      icon={<ApiOutlined />}
+                      loading={testingId === p.id}
+                      onClick={() => void runTest(p)}
+                    >
+                      测试
+                    </Button>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(p)}>
+                      配置
+                    </Button>
+                  </Space>
                 </div>
-                {/* 第二行：操作按钮 */}
-                <Space size={8} style={{ marginTop: 3 }}>
-                  <Button
-                    size="small"
-                    icon={<ApiOutlined />}
-                    loading={testingId === p.id}
-                    onClick={() => void runTest(p)}
-                  >
-                    测试连接
-                  </Button>
-                  <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(p)}>
-                    配置
-                  </Button>
-                </Space>
               </List.Item>
             )
           }}

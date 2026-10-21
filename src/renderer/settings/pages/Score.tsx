@@ -1,7 +1,6 @@
 import { App as AntdApp, Card, Col, InputNumber, Row, Typography } from 'antd'
 import type { ScoreConfig } from '@shared/types'
 import { useConfigStore } from '@renderer/stores/config'
-import Hint from '@renderer/settings/Hint'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -39,10 +38,8 @@ export default function ScorePage() {
         分值配置
       </Title>
       <Paragraph className="page-desc">
-        设置总分值、打分范围与步长；AI 给分自动对齐步长并夹取到范围内。
+        总分值 / 打分范围 / 步长；AI 给分自动对齐步长并夹取到范围。
       </Paragraph>
-
-      <Hint text="一键定位检测到多个分数输入框时自动分小题：总分值自动平均分配到各小题，评分标准统一引用整体评分标准。" />
 
       <Card styles={{ body: { padding: 14 } }}>
         <Row gutter={[12, 12]}>
@@ -95,9 +92,6 @@ export default function ScorePage() {
             />
           </Col>
         </Row>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
-          示例：范围 0~12、步长 1 时，AI 给出 11.7 分将自动修正为 12 分；给出 13 分将被夹取为 12 分。
-        </Text>
       </Card>
     </div>
   )

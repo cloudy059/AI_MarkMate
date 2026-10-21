@@ -30,13 +30,13 @@ const REGION_DEFS: RegionDef[] = [
     kind: 'answer',
     label: '答题区域',
     how: '矩形框选',
-    desc: '批改时循环截取该区域作为题目图像提交 AI 识别评分。建议框住完整作答内容，不含无关区域以提升识别准确度。'
+    desc: '批改时截取该区域提交 AI 识别评分，建议框住完整作答。'
   },
   {
     kind: 'submit',
     label: '提交按钮',
     how: '单点点击',
-    desc: '分数填写完成后自动点击提交，实现与现有阅卷系统的自动对接与翻页。'
+    desc: '填分后自动点击提交并翻页。'
   }
 ]
 
@@ -250,43 +250,22 @@ export default function RegionsPage() {
         答题区域标记
       </Title>
       <Paragraph className="page-desc">
-        标记答题区域、分值输入框与提交按钮，批改时自动完成「截题 → 评分 → 填分 → 提交」；全屏遮罩中 <b>ESC</b> 可取消。
+        标记答题区域、分值框与提交按钮，批改时自动「截题 → 评分 → 填分 → 提交」；全屏遮罩中 ESC 取消。
       </Paragraph>
 
-      <Hint
-        text="标记前先把阅卷系统窗口调到实际批改位置与缩放；移动/缩放窗口后需重新标记。"
-        detail={
-          <ul style={{ margin: 0, paddingLeft: 16 }}>
-            <li>多显示器会为每个屏幕弹出标记层，请在目标屏幕操作。</li>
-            <li>自动填分无效时，点下方「自动化校准」重新探测键鼠模拟方案。</li>
-          </ul>
-        }
-      />
+      <Hint text="标记前将阅卷系统窗口调到实际批改位置；移动/缩放窗口后需重新标记。" />
 
       <Space direction="vertical" size={10} style={{ width: '100%', marginTop: 10 }}>
-        {/* AI 一键定位 */}
-        <Card
-          size="small"
-          title={
-            <Space size={6}>
-              <ThunderboltOutlined style={{ color: '#1677ff' }} />
-              <span>AI 一键定位</span>
-            </Space>
-          }
-          styles={{ body: { padding: '10px 12px' } }}
-        >
-          <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-            自动截屏识别答题区域、分值输入框、提交按钮（智学网等平台），识别结果直接在屏幕元素上显示定位框：拖动框体移动、拖动圆点调整大小，确认后保存；检测到多个分数输入框时自动分小题。使用批改工作流配置的识别模型，需先配置可用的多模态模型。
-          </Text>
+        {/* AI 自动定位 */}
+        <Card size="small" styles={{ body: { padding: '10px 12px' } }}>
           <Button
             block
             type="primary"
             icon={<ThunderboltOutlined />}
             loading={locating}
             onClick={() => void runLocate()}
-            style={{ marginTop: 10 }}
           >
-            {locating ? '正在截屏识别（约 5–30 秒）…' : '一键定位'}
+            {locating ? '正在截屏识别（约 5–30 秒）…' : 'AI自动定位'}
           </Button>
         </Card>
 
@@ -376,8 +355,7 @@ export default function RegionsPage() {
           styles={{ body: { padding: '10px 12px' } }}
         >
           <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-            标记一次 = 整题分值框；继续标记则按顺序作为小题 1/2/3…
-            各自的分值框，每题满分自动按「总分值 ÷ 题数」平均分配。标记错位时点「清除」重新开始。
+            首次标记为整题分值框；继续标记按顺序作为小题 1/2/3… 的分值框，满分自动均分。
           </Text>
           <Space size={8} style={{ marginTop: 10 }}>
             <Button
@@ -447,7 +425,7 @@ export default function RegionsPage() {
       >
         {shot?.dataUrl && <img className="region-shot" src={shot.dataUrl} alt="区域截屏" />}
         <Paragraph type="secondary" style={{ marginTop: 8, fontSize: 12 }}>
-          请确认截屏内容完整清晰。若出现偏移、黑屏或截错屏幕，请重新标记或调整阅卷系统窗口位置。
+          确认截屏内容完整清晰，异常时请重新标记。
         </Paragraph>
       </Modal>
     </div>

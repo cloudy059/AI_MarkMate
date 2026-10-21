@@ -42,6 +42,24 @@ class ConfigStore {
         const saved = JSON.parse(raw) as Record<string, unknown>
         const merged = deepMerge(defaultConfig(), saved)
         merged.version = CURRENT_CONFIG_VERSION
+        // 迁移：普通模式已移除，原 5 秒倒计时语义由无人值守倒计时承接
+        if ((merged.workflow.gradingMode as string) === 'normal') {
+          merged.workflow.gradingMode = 'unattended'
+          const savedWf = (saved.workflow ?? {}) as Record<string, unknown>
+          if (savedWf.unattendedDelaySec === undefined) merged.workflow.unattendedDelaySec = 5
+        }
+        // 迁移：简化服务商默认名称（去除公司名 / 本机后缀）；用户自定义过名称的不受影响
+        const PROVIDER_NAME_MIGRATION: Record<string, string> = {
+          '豆包（火山方舟）': '豆包',
+          'Kimi（月之暗面）': 'Kimi',
+          '自定义中转接口': '自定义接口',
+          'Ollama（本机）': 'Ollama',
+          'LM Studio（本机）': 'LM Studio'
+        }
+        for (const p of merged.providers) {
+          const n = PROVIDER_NAME_MIGRATION[p.name]
+          if (n) p.name = n
+        }
         // 保证评分标准定长 10
         while (merged.scoringStandards.length < 10) merged.scoringStandards.push(null)
         merged.scoringStandards.length = 10

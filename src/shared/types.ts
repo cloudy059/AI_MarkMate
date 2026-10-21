@@ -66,7 +66,7 @@ export interface ProviderRef {
 /** 识别评分模式：A 多模态直评 / B 本机OCR二次评分 / C 云端OCR二次评分 */
 export type RecognizeMode = 'A' | 'B' | 'C'
 /** 批改控制模式 */
-export type GradingMode = 'normal' | 'trial' | 'unattended' | 'double'
+export type GradingMode = 'trial' | 'unattended' | 'double'
 
 export interface DeepThinkConfig {
   enabled: boolean
@@ -85,6 +85,10 @@ export interface WorkflowConfig {
     ocr: ProviderRef | null
   }
   gradingMode: GradingMode
+  /** 无人值守模式提交前倒计时秒数（0 = 评分后立即提交） */
+  unattendedDelaySec: number
+  /** 双评模式提交前倒计时秒数（默认 5） */
+  doubleDelaySec: number
   /** 双评分差阈值（超过则人工仲裁） */
   doubleThreshold: number
   deepThink: DeepThinkConfig

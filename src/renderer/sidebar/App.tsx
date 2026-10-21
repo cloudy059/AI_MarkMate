@@ -202,14 +202,14 @@ export default function SidebarApp() {
               <Tag color={info.color}>{info.label}</Tag>
               {config && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  模式：{gradingMode === 'normal' ? '普通' : gradingMode === 'trial' ? '试改' : gradingMode === 'unattended' ? '无人值守' : '双评'}
+                  模式：{gradingMode === 'trial' ? '试改' : gradingMode === 'unattended' ? '无人值守' : '双评'}
                   · {wf?.mode === 'A' ? '多模态直评' : wf?.mode === 'B' ? '本机OCR二次评分' : '云端OCR二次评分'}
                 </Text>
               )}
             </Space>
             {g.message && <Text style={{ fontSize: 12 }}>{g.message}</Text>}
 
-            {/* 倒计时（普通/双评 5 秒；无人值守不倒计时直接提交） */}
+            {/* 倒计时（无人值守/双评按自定义时长，0 = 直接提交） */}
             {g.state === 'awaiting_submit' && g.countdown > 0 && (
               <>
                 <div className="countdown-big">{g.countdown}</div>
@@ -270,7 +270,6 @@ export default function SidebarApp() {
                 value={wf.gradingMode}
                 onChange={(v) => saveWf({ gradingMode: v as WorkflowConfig['gradingMode'] })}
                 options={[
-                  { label: '普通', value: 'normal' },
                   { label: '试改', value: 'trial' },
                   { label: '无人', value: 'unattended' },
                   { label: '双评', value: 'double' }
@@ -279,8 +278,23 @@ export default function SidebarApp() {
               <div style={{ marginTop: 4 }}>
                 <Hint text={GRADING_MODE_DESC[wf.gradingMode]} />
               </div>
-              {wf.gradingMode === 'double' && (
+              {wf.gradingMode === 'unattended' && (
                 <Space size={6} style={{ marginTop: 6 }}>
+                  <Text style={{ fontSize: 12 }}>提交倒计时</Text>
+                  <InputNumber
+                    size="small"
+                    value={wf.unattendedDelaySec}
+                    onChange={(v) => saveWf({ unattendedDelaySec: Math.max(0, Number(v) || 0) })}
+                    min={0}
+                    max={60}
+                    step={1}
+                    addonAfter="秒"
+                    style={{ width: 55 }}
+                  />
+                </Space>
+              )}
+              {wf.gradingMode === 'double' && (
+                <Space size={6} style={{ marginTop: 6 }} wrap>
                   <Text style={{ fontSize: 12 }}>分差阈值</Text>
                   <InputNumber
                     size="small"
@@ -290,7 +304,18 @@ export default function SidebarApp() {
                     max={100}
                     step={0.5}
                     addonAfter="分"
-                    style={{ width: 110 }}
+                    style={{ width: 55 }}
+                  />
+                  <Text style={{ fontSize: 12 }}>提交倒计时</Text>
+                  <InputNumber
+                    size="small"
+                    value={wf.doubleDelaySec}
+                    onChange={(v) => saveWf({ doubleDelaySec: Math.max(0, Number(v) || 0) })}
+                    min={0}
+                    max={60}
+                    step={1}
+                    addonAfter="秒"
+                    style={{ width: 55 }}
                   />
                 </Space>
               )}
@@ -308,13 +333,13 @@ export default function SidebarApp() {
               max={9999}
               step={1}
               addonAfter="份"
-              placeholder="份数不限"
-              style={{ width: 132 }}
+              placeholder="不限"
+              style={{ width: 66 }}
             />
           )}
           {!running && (
             <Button type="primary" icon={<PlayCircleOutlined />} onClick={doStart}>
-              开始批改
+              批改
             </Button>
           )}
           {running && !paused && (
@@ -341,7 +366,7 @@ export default function SidebarApp() {
           )}
         </Space>
 
-        {/* 等待提交（试改=人工确认；普通/无人值守=可立即提交） */}
+        {/* 等待提交（试改=人工确认；无人值守/双评=可立即提交） */}
         {g.state === 'awaiting_submit' && (
           <Card size="small" title="提交确认" styles={{ body: { padding: '8px 12px' } }}>
             <Space direction="vertical" style={{ width: '100%' }}>

@@ -64,7 +64,7 @@ export function createSidebar(): BrowserWindow {
   const cfg = configStore.get()
   const primary = screen.getPrimaryDisplay()
   const win = new BrowserWindow({
-    width: 360,
+    width: 400,
     height: 700,
     minWidth: 300,
     minHeight: 420,
@@ -81,7 +81,7 @@ export function createSidebar(): BrowserWindow {
   win.setAlwaysOnTop(true, 'screen-saver')
   const pos = cfg.settings.sidebarPos
   if (pos) win.setPosition(Math.round(pos.x), Math.round(pos.y))
-  else win.setPosition(primary.workArea.x + primary.workArea.width - 380, primary.workArea.y + 80)
+  else win.setPosition(primary.workArea.x + primary.workArea.width - 420, primary.workArea.y + 80)
   loadRenderer(win, 'sidebar')
 
   let saveTimer: NodeJS.Timeout | null = null

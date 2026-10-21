@@ -74,7 +74,7 @@ export default function PresetsPage() {
     const wf = p.snapshot.workflow
     const sc = p.snapshot.scoreConfig
     const parts: string[] = []
-    if (wf) parts.push(`${wf.mode === 'A' ? '多模态直评' : wf.mode === 'B' ? '本机OCR' : '云端OCR'} · ${wf.gradingMode === 'normal' ? '普通' : wf.gradingMode === 'trial' ? '试改' : wf.gradingMode === 'unattended' ? '无人值守' : '双评'}`)
+    if (wf) parts.push(`${wf.mode === 'A' ? '多模态直评' : wf.mode === 'B' ? '本机OCR' : '云端OCR'} · ${wf.gradingMode === 'trial' ? '试改' : wf.gradingMode === 'unattended' ? '无人值守' : '双评'}`)
     if (sc) parts.push(`总分 ${sc.total}`)
     if (p.snapshot.subQuestions?.length) parts.push(`${p.snapshot.subQuestions.length} 个小题`)
     return parts.join(' · ')

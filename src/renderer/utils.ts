@@ -73,7 +73,7 @@ export const VENDOR_INFO: Record<string, VendorInfo> = {
     consoleUrl: 'https://open.bigmodel.cn/apikey/platform'
   },
   doubao: {
-    name: '豆包（火山方舟）',
+    name: '豆包',
     hint: '火山方舟 Ark v3，OpenAI 兼容；模型名可填推理接入点 ID(ep-xxx)',
     fixedUrl: true,
     local: false,
@@ -81,7 +81,7 @@ export const VENDOR_INFO: Record<string, VendorInfo> = {
     consoleUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey'
   },
   moonshot: {
-    name: 'Kimi（月之暗面）',
+    name: 'Kimi',
     hint: '月之暗面开放平台，OpenAI 兼容',
     fixedUrl: true,
     local: false,
@@ -98,7 +98,7 @@ export const VENDOR_INFO: Record<string, VendorInfo> = {
   },
   openai: {
     name: 'OpenAI',
-    hint: '官方 API；也可在「自定义中转」配置代理地址',
+    hint: '官方 API；也可在「自定义接口」配置代理地址',
     fixedUrl: true,
     local: false,
     hasVision: true,
@@ -136,21 +136,21 @@ export const VENDOR_INFO: Record<string, VendorInfo> = {
     consoleUrl: 'https://platform.minimaxi.com/'
   },
   custom: {
-    name: '自定义中转接口',
+    name: '自定义接口',
     hint: '任意 OpenAI 协议格式的第三方中转：填完整地址（含 /v1）、密钥与模型名',
     fixedUrl: false,
     local: false,
     hasVision: true
   },
   ollama: {
-    name: 'Ollama（本机）',
+    name: 'Ollama',
     hint: '本机 Ollama 服务，无需密钥；视觉模型建议 qwen2.5vl / llama3.2-vision',
     fixedUrl: false,
     local: true,
     hasVision: true
   },
   lmstudio: {
-    name: 'LM Studio（本机）',
+    name: 'LM Studio',
     hint: '本机 LM Studio 本地服务器，无需密钥；地址默认 http://127.0.0.1:1234/v1',
     fixedUrl: false,
     local: true,

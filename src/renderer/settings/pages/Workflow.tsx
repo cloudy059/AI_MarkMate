@@ -21,10 +21,9 @@ export const MODE_DESC: Record<string, string> = {
 }
 
 export const GRADING_MODE_DESC: Record<string, string> = {
-  normal: '评分完成后 5 秒倒计时自动提交',
   trial: '每题评分后等待人工确认再提交（首次使用推荐）',
-  unattended: '评分完成后直接自动提交，适合大批量挂机',
-  double: '两个独立模型分别评分取平均，分差超阈值触发人工仲裁；评分后 5 秒自动提交'
+  unattended: '评分后倒计时自动提交（时长可在主页「批改模式」卡片调整，默认 0 秒直接提交），适合大批量挂机',
+  double: '两个独立模型分别评分取平均，分差超阈值触发人工仲裁；评分后倒计时自动提交（默认 5 秒，可在主页「批改模式」卡片调整）'
 }
 
 /** 模型与规则配置：评分 / 识别 / 双评第二模型来源、全局评分规则 */

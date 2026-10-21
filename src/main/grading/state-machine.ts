@@ -534,39 +534,43 @@ class GradingEngine {
       record.arbited = record.subScores[0]?.arbited
     }
 
-    // ---- 4) 等待提交（四模式）：普通/双评 5 秒倒计时自动提交，无人值守直接提交，试改需人工确认
+    // ---- 4) 等待提交：试改需人工确认；无人值守/双评倒计时可自定义（无人默认 0 秒，双评默认 5 秒，0 = 立即提交）
     this.setState('awaiting_submit')
     let submitDecision: 'submit' | 'skip' = 'submit'
-    if (gradingMode === 'unattended') {
-      // 无人值守：评分完成立即提交，不倒计时
-      this.emit({ type: 'countdown', secondsLeft: 0 })
-    } else if (gradingMode === 'trial') {
+    if (gradingMode === 'trial') {
       const r = await this.waitUser('confirm')
       if (r === 'stop') throw new LoopAbort()
       if (r === 'reject' || r === 'skip') submitDecision = 'skip'
     } else {
-      const waitSec = 5
-      let cancelled = false
-      for (let s = waitSec; s > 0 && !cancelled; s--) {
-        this.emit({ type: 'countdown', secondsLeft: s })
-        const r = await Promise.race([sleep(1000).then(() => 'tick'), this.waitUser('interrupt')])
-        if (r === 'tick') {
-          this.waiter = null
-          this.waitKind = null
-          continue
+      const waitSec =
+        gradingMode === 'unattended'
+          ? Math.max(0, configStore.get().workflow.unattendedDelaySec ?? 0)
+          : Math.max(0, configStore.get().workflow.doubleDelaySec ?? 5)
+      if (waitSec <= 0) {
+        this.emit({ type: 'countdown', secondsLeft: 0 })
+      } else {
+        let cancelled = false
+        for (let s = waitSec; s > 0 && !cancelled; s--) {
+          this.emit({ type: 'countdown', secondsLeft: s })
+          const r = await Promise.race([sleep(1000).then(() => 'tick'), this.waitUser('interrupt')])
+          if (r === 'tick') {
+            this.waiter = null
+            this.waitKind = null
+            continue
+          }
+          if (r === 'confirm') cancelled = true
+          else if (r === 'reject' || r === 'skip') {
+            submitDecision = 'skip'
+            cancelled = true
+          } else if (r === 'paused') {
+            this.setState('paused_manual', '已暂停')
+            const r2 = await this.waitUser('resume')
+            if (r2 === 'stop') throw new LoopAbort()
+            s = waitSec + 1
+          } else if (r === 'stop') throw new LoopAbort()
         }
-        if (r === 'confirm') cancelled = true
-        else if (r === 'reject' || r === 'skip') {
-          submitDecision = 'skip'
-          cancelled = true
-        } else if (r === 'paused') {
-          this.setState('paused_manual', '已暂停')
-          const r2 = await this.waitUser('resume')
-          if (r2 === 'stop') throw new LoopAbort()
-          s = waitSec + 1
-        } else if (r === 'stop') throw new LoopAbort()
+        this.emit({ type: 'countdown', secondsLeft: 0 })
       }
-      this.emit({ type: 'countdown', secondsLeft: 0 })
     }
 
     // ---- 5) 填分 + 提交（多分值框一次性批量填充，紧凑节奏提升效率） ----

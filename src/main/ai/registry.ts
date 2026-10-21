@@ -58,7 +58,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
   },
   doubao: {
     kind: 'doubao',
-    name: '豆包（火山方舟）',
+    name: '豆包',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     chatModel: 'doubao-seed-2-0-lite-260428',
     visionModel: 'doubao-seed-2-0-lite-260428',
@@ -70,7 +70,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
   },
   moonshot: {
     kind: 'moonshot',
-    name: 'Kimi（月之暗面）',
+    name: 'Kimi',
     baseUrl: 'https://api.moonshot.cn/v1',
     chatModel: 'kimi-latest',
     visionModel: 'moonshot-v1-8k-vision-preview',
@@ -102,7 +102,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
     protocol: 'openai',
     thinking: 'reasoning_effort',
     fixedUrl: true,
-    hint: '官方 API；也可在「自定义中转」配置代理地址'
+    hint: '官方 API；也可在「自定义接口」配置代理地址'
   },
   gemini: {
     kind: 'gemini',
@@ -154,7 +154,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
   },
   custom: {
     kind: 'custom',
-    name: '自定义中转接口',
+    name: '自定义接口',
     baseUrl: '',
     chatModel: '',
     visionModel: '',
@@ -166,7 +166,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
   },
   ollama: {
     kind: 'ollama',
-    name: 'Ollama（本机）',
+    name: 'Ollama',
     baseUrl: 'http://127.0.0.1:11434',
     chatModel: 'qwen3:8b',
     visionModel: 'qwen2.5vl:7b',
@@ -178,7 +178,7 @@ export const VENDOR_PRESETS: Record<ProviderKind, VendorPreset> = {
   },
   lmstudio: {
     kind: 'lmstudio',
-    name: 'LM Studio（本机）',
+    name: 'LM Studio',
     baseUrl: 'http://127.0.0.1:1234/v1',
     chatModel: '',
     visionModel: '',
@@ -250,6 +250,8 @@ export function defaultConfig(): AppConfig {
         ocr: { source: 'local', providerId: ollama.id }
       },
       gradingMode: 'trial',
+      unattendedDelaySec: 0,
+      doubleDelaySec: 5,
       doubleThreshold: 2,
       deepThink: { enabled: false, level: 2 },
       nextDelayMs: 2000,
