@@ -127,3 +127,8 @@ src/
   - `config.json`：全部配置（服务商、区域标记、评分标准、批改参数）
   - `standards/`：评分标准嵌入图与示例参考图
   - `logs/`：运行日志与批改截图存档（30 天自动清理）
+## 给杯咖啡
+<img width="894" height="1219" alt="微信图片_20261021222308_51_13" src="https://github.com/user-attachments/assets/833ab0b7-90b9-40be-a575-54eed06b1273" /><img width="1080" height="1620" alt="微信图片_20261021222309_52_13" src="https://github.com/user-attachments/assets/19d97767-f237-49dd-b9c0-01fc3395aca9" />
+
+
+
