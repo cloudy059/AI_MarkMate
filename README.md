@@ -55,6 +55,8 @@
 ---
 
 ## 快速开始
+配置AI服务商（以豆包为例）
+<img width="1920" height="1080" alt="捕获_annotated (4)" src="https://github.com/user-attachments/assets/bf0d4d5e-41e2-4414-834f-4fe20ae0b5b2" />
 
 ### 环境要求
 
