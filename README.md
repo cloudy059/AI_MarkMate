@@ -57,6 +57,7 @@
 ## 快速开始
 配置AI服务商（以豆包为例）
 <img width="1920" height="1080" alt="捕获_annotated (4)" src="https://github.com/user-attachments/assets/bf0d4d5e-41e2-4414-834f-4fe20ae0b5b2" />
+<img width="1660" height="853" alt="Untitled-1" src="https://github.com/user-attachments/assets/5fcf9dd5-89b2-4731-900d-2031726b5298" />
 
 ### 环境要求
 
@@ -130,7 +131,8 @@ src/
   - `standards/`：评分标准嵌入图与示例参考图
   - `logs/`：运行日志与批改截图存档（30 天自动清理）
 ## 给杯咖啡
-<img width="637" height="455" alt="微信图片_20261021222308_51_13" src="https://github.com/user-attachments/assets/2e0e8ade-c3cf-400e-9ca5-2afd11b04e2c" />
+<img width="614" height="340" alt="680383004-2e0e8ade-c3cf-400e-9ca5-2afd11b04e2c" src="https://github.com/user-attachments/assets/5fb31ffe-4bd1-4716-b272-e963e85d911c" />
+
 
 
 
