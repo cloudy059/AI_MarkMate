@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Segmented } from 'antd'
+import ProvidersPage from './Providers'
 import WorkflowPage from './Workflow'
 import StandardsPage from './Standards'
 import RegionsPage from './Regions'
@@ -41,27 +42,39 @@ function MergedShell({ sections, section }: { sections: SectionDef[]; section?: 
   )
 }
 
-/** 模型与评分标准（合并页）：模型与规则 + 评分标准 */
+/** AI 服务商与模型（合并页）：AI 服务商 + 模型与规则 */
 export function ModelsPage({ section }: { section?: string }) {
   return (
     <MergedShell
       section={section}
       sections={[
-        { key: 'workflow', label: '模型与规则', node: <WorkflowPage /> },
-        { key: 'standards', label: '评分标准', node: <StandardsPage /> }
+        { key: 'providers', label: 'AI 服务商', node: <ProvidersPage /> },
+        { key: 'workflow', label: '模型与规则', node: <WorkflowPage /> }
       ]}
     />
   )
 }
 
-/** 答题区域与分值（单页）：分值配置在上、答题区域标记在下；分小题由一键定位/多次标记自动创建 */
-export function MarkingPage() {
+/** 评分标准与答题区域（合并页）：评分标准（分值配置在上）+ 答题区域标记 */
+export function MarkingPage({ section }: { section?: string }) {
   return (
-    <div>
-      <ScorePage />
-      <div style={{ marginTop: 16 }}>
-        <RegionsPage />
-      </div>
-    </div>
+    <MergedShell
+      section={section}
+      sections={[
+        {
+          key: 'standards',
+          label: '评分标准',
+          node: (
+            <div>
+              <ScorePage />
+              <div style={{ marginTop: 16 }}>
+                <StandardsPage />
+              </div>
+            </div>
+          )
+        },
+        { key: 'regions', label: '答题区域', node: <RegionsPage /> }
+      ]}
+    />
   )
 }

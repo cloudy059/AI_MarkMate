@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react'
 import {
-  ApartmentOutlined,
+  AuditOutlined,
   CloudServerOutlined,
   FileTextOutlined,
   RocketOutlined,
-  SaveOutlined,
-  SelectOutlined
+  SaveOutlined
 } from '@ant-design/icons'
 import OnboardingPage from './Onboarding'
-import ProvidersPage from './Providers'
 import { ModelsPage, MarkingPage } from './Merged'
 import PresetsPage from './Presets'
 import LogsPage from './Logs'
@@ -23,7 +21,7 @@ export interface SettingsPageDef {
 
 /**
  * 设置页注册表：侧边栏设置视图按此渲染菜单与详情页。
- * 合并页支持「key:分区」形式（如 models:standards 直达评分标准分区）。
+ * 合并页支持「key:分区」形式（如 models:providers 直达服务商分区）。
  */
 export const SETTINGS_PAGES: SettingsPageDef[] = [
   {
@@ -34,25 +32,18 @@ export const SETTINGS_PAGES: SettingsPageDef[] = [
     render: (go) => <OnboardingPage go={go} />
   },
   {
-    key: 'providers',
-    label: 'AI 服务商',
-    desc: '云端 / 本机 / 局域网模型接入与测试',
-    icon: <CloudServerOutlined />,
-    render: () => <ProvidersPage />
-  },
-  {
     key: 'models',
-    label: '模型与评分标准',
-    desc: '模型角色 / 全局规则 / 评分标准与细则',
-    icon: <ApartmentOutlined />,
+    label: 'AI 服务商与模型',
+    desc: '服务商接入 / 模型角色 / 全局规则',
+    icon: <CloudServerOutlined />,
     render: (_go, page) => <ModelsPage section={parseSection(page)} />
   },
   {
     key: 'marking',
-    label: '答题区域与分值',
-    desc: '区域标记 / 一键定位 / 分值范围与步长',
-    icon: <SelectOutlined />,
-    render: () => <MarkingPage />
+    label: '评分标准与答题区域',
+    desc: '评分标准 / 分值配置 / 区域标记',
+    icon: <AuditOutlined />,
+    render: (_go, page) => <MarkingPage section={parseSection(page)} />
   },
   {
     key: 'presets',
@@ -79,15 +70,17 @@ export function parseSection(page: string): string | undefined {
 /** 旧页键 → 合并页分区键（外部导航沿用旧键时自动映射） */
 export function normalizeSettingsPage(p: string): string {
   switch (p) {
+    case 'providers':
+      return 'models:providers'
     case 'workflow':
       return 'models:workflow'
     case 'standards':
-      return 'models:standards'
+    case 'score':
+      return 'marking:standards'
     case 'regions':
     case 'sub-questions':
     case 'subs-score':
-    case 'score':
-      return 'marking'
+      return 'marking:regions'
     default:
       return p
   }

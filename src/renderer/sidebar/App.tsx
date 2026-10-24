@@ -16,20 +16,23 @@ import {
   Typography
 } from 'antd'
 import {
+  ApartmentOutlined,
   CheckOutlined,
+  CloudServerOutlined,
   DownloadOutlined,
+  FileTextOutlined,
   HomeOutlined,
   LeftOutlined,
   MinusOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
   RightOutlined,
+  SelectOutlined,
   SettingOutlined,
   StopOutlined,
   UploadOutlined
 } from '@ant-design/icons'
 import type { GradingState, WorkflowConfig } from '@shared/types'
-import { isStandardUsable } from '@shared/types'
 import { useConfigStore } from '@renderer/stores/config'
 import { useGradingStore } from '@renderer/stores/grading'
 import { SETTINGS_PAGES, normalizeSettingsPage, settingsPageByKey } from '@renderer/settings/pages'
@@ -57,7 +60,7 @@ const STATE_INFO: Record<GradingState, { label: string; color: string }> = {
   paused_error: { label: '异常暂停', color: 'error' }
 }
 
-/** 悬浮侧边栏：批改控制台（状态/倒计时/四模式/仲裁/人工兜底/统计/标准切换）+ 集成设置视图 */
+/** 悬浮侧边栏：批改控制台（状态/倒计时/四模式/仲裁/人工兜底/统计/设置入口）+ 集成设置视图 */
 export default function SidebarApp() {
   const { config, load, patch } = useConfigStore()
   const g = useGradingStore()
@@ -148,20 +151,9 @@ export default function SidebarApp() {
     void g.control('manualScore', parts)
     setManualScore('')
   }
-  const std = config ? config.scoringStandards[config.activeStandardIndex] : null
-  const stdUsable = isStandardUsable(std)
-  const stdName = std?.name?.trim() || `第 ${(config?.activeStandardIndex ?? 0) + 1} 套（未命名）`
-
   const doStart = async () => {
     const r = await g.control('start')
     if (!r.ok && r.message) void message.warning(r.message)
-  }
-
-  const switchStandard = async (delta: number) => {
-    if (!config) return
-    const len = config.scoringStandards.length || 10
-    const next = (config.activeStandardIndex + delta + len) % len
-    await patch({ activeStandardIndex: next })
   }
 
   const info = STATE_INFO[g.state] ?? STATE_INFO.idle
@@ -219,33 +211,22 @@ export default function SidebarApp() {
           </Space>
         </Card>
 
-        {/* 评分标准循环切换 */}
-        <Card size="small" title="当前评分标准" styles={{ body: { padding: '8px 12px' } }}>
-          <div className="std-switch">
-            <Button size="small" icon={<LeftOutlined />} onClick={() => void switchStandard(-1)} />
-            <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-              <Text strong ellipsis={{ tooltip: stdName }} style={{ fontSize: 12, maxWidth: 150 }}>
-                {stdName}
-              </Text>
-              <div>
-                <Tag color={stdUsable ? 'green' : 'red'} style={{ fontSize: 11 }}>
-                  {stdUsable ? '可用' : '内容为空'}
-                </Tag>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  第 {(config?.activeStandardIndex ?? 0) + 1} / {config?.scoringStandards.length ?? 10} 套
-                </Text>
-              </div>
-            </div>
-            <Button size="small" icon={<RightOutlined />} onClick={() => void switchStandard(1)} />
+        {/* 前期设置入口：直达各设置分区 */}
+        <Card size="small" title="前期设置" styles={{ body: { padding: '8px 10px' } }}>
+          <div className="setup-links">
+            <Button icon={<CloudServerOutlined />} onClick={() => openSettingsPage('models:providers')}>
+              AI 服务商
+            </Button>
+            <Button icon={<ApartmentOutlined />} onClick={() => openSettingsPage('models:workflow')}>
+              模型与规则
+            </Button>
+            <Button icon={<FileTextOutlined />} onClick={() => openSettingsPage('marking:standards')}>
+              评分标准
+            </Button>
+            <Button icon={<SelectOutlined />} onClick={() => openSettingsPage('marking:regions')}>
+              答题区域
+            </Button>
           </div>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => openSettingsPage('standards')}
-            style={{ padding: 0, marginTop: 4 }}
-          >
-            编辑评分标准
-          </Button>
         </Card>
 
         {/* 批改模式（高频切换） */}
