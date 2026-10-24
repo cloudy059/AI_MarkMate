@@ -12,8 +12,11 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "build:win": "electron-vite build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac"
+    "build:win": "electron-vite build && electron-builder --win --publish never",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:linux": "electron-vite build && electron-builder --linux dir && node scripts/pack-deb.mjs",
+    "build:linux:arm64": "electron-vite build && electron-builder --linux dir --arm64 && node scripts/pack-deb.mjs --arch arm64",
+    "pack:deb": "node scripts/pack-deb.mjs"
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "4.2.6"

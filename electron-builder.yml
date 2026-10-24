@@ -26,3 +26,11 @@ mac:
   icon: resources/icon.png
   extendInfo:
     NSAppleEventsUsageDescription: 用于自动点击分值输入框与提交按钮，完成自动阅卷提交。
+linux:
+  target:
+    - deb
+  icon: resources/icon.png
+  category: Education
+  packageCategory: utils
+  maintainer: AI Grading Assistant <ai-grading-assistant@localhost>
+  synopsis: AI自动阅卷桌面侧边栏助手

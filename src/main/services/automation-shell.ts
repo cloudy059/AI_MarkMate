@@ -21,7 +21,37 @@ public class W {
 [W]::SetProcessDpiAwarenessContext(-4) | Out-Null
 `
 
-/** 实现B：零依赖系统脚本（Win: PowerShell+user32 / macOS: osascript），nut-js 不可用时自动降级 */
+// ---------- Linux xdotool 键名映射 ----------
+const XKEY_MAP: Record<string, string> = {
+  enter: 'Return',
+  tab: 'Tab',
+  esc: 'Escape',
+  space: 'space',
+  backspace: 'BackSpace',
+  delete: 'Delete',
+  up: 'Up',
+  down: 'Down',
+  left: 'Left',
+  right: 'Right',
+  home: 'Home',
+  end: 'End'
+}
+const XMOD_MAP: Record<string, string> = {
+  ctrl: 'ctrl',
+  alt: 'alt',
+  shift: 'shift',
+  meta: 'super'
+}
+/** 将应用层键名转为 xdotool 键名（f5→F5，单字符原样） */
+function toXKey(key: string): string | undefined {
+  if (XKEY_MAP[key]) return XKEY_MAP[key]
+  const f = /^f(\d+)$/i.exec(key)
+  if (f) return `F${f[1]}`
+  if (key.length === 1) return key
+  return undefined
+}
+
+/** 实现B：零依赖系统脚本（Win: PowerShell+user32 / macOS: osascript / Linux: xdotool），nut-js 不可用时自动降级 */
 export class ShellAutomation implements IAutomation {
   readonly impl = 'shell' as const
 
@@ -33,6 +63,10 @@ export class ShellAutomation implements IAutomation {
           ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `${PS_WIN_HELPER}[W]::GetCursorPos([ref]([PT]::new())) | Out-Null`],
           { timeout: 8000, windowsHide: true }
         )
+        return true
+      }
+      if (process.platform === 'linux') {
+        await exec('xdotool', ['version'], { timeout: 8000 })
         return true
       }
       await exec('osascript', ['-e', 'tell application "System Events" to get name of every process'], { timeout: 8000 })
@@ -56,6 +90,13 @@ $p = New-Object PT
       if (!m) throw new Error('无法读取鼠标位置')
       return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) }
     }
+    if (process.platform === 'linux') {
+      const { stdout } = await exec('xdotool', ['getmouselocation', '--shell'], { timeout: 8000 })
+      const xm = /^X=(-?\d+)$/m.exec(stdout)
+      const ym = /^Y=(-?\d+)$/m.exec(stdout)
+      if (!xm || !ym) throw new Error('无法读取鼠标位置')
+      return { x: parseInt(xm[1], 10), y: parseInt(ym[1], 10) }
+    }
     throw new Error('macOS 暂不支持脚本方式读取鼠标位置，标记坐标将采用换算方式')
   }
 
@@ -72,6 +113,14 @@ Start-Sleep -Milliseconds 50
 [W]::mouse_event(4,0,0,0,[UIntPtr]::Zero)`
         ],
         { timeout: 10000, windowsHide: true }
+      )
+      return
+    }
+    if (process.platform === 'linux') {
+      await exec(
+        'xdotool',
+        ['mousemove', '--sync', String(Math.round(x)), String(Math.round(y)), 'click', '1'],
+        { timeout: 10000 }
       )
       return
     }
@@ -103,6 +152,13 @@ if (${useCtrl ? 1 : 0}) { [W]::keybd_event(0x11,0,2,[UIntPtr]::Zero) }`
       )
       return
     }
+    if (process.platform === 'linux') {
+      const k = toXKey(key)
+      if (!k) throw new Error(`不支持的按键：${key}`)
+      const combo = [...modifiers.map((m) => XMOD_MAP[m]).filter(Boolean), k].join('+')
+      await exec('xdotool', ['key', '--clearmodifiers', combo], { timeout: 10000 })
+      return
+    }
     // macOS key codes: a=0 v=9 c=8 x=7 enter=36 tab=48 esc=53 space=49
     const macCodes: Record<string, number> = { a: 0, c: 8, v: 9, x: 7, enter: 36, tab: 48, esc: 53, space: 49 }
     const code = macCodes[key]
@@ -126,6 +182,11 @@ if (${useCtrl ? 1 : 0}) { [W]::keybd_event(0x11,0,2,[UIntPtr]::Zero) }`
         ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("${safe}")`],
         { timeout: 10000, windowsHide: true }
       )
+      return
+    }
+    if (process.platform === 'linux') {
+      // xdotool type：-- 后为纯字面量（execFile 不经 shell，无注入风险）；非键盘字符会被跳过
+      await exec('xdotool', ['type', '--delay', '60', '--clearmodifiers', '--', text], { timeout: 15000 })
       return
     }
     const safe = text.replace(/["\\]/g, '\\$&')
