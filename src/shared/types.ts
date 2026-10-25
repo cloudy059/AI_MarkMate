@@ -403,6 +403,9 @@ export const IPC = {
   GradingControl: 'grading:control',
   GradingEvent: 'grading:event',
   GradingStats: 'grading:stats',
+  // 阅卷后答题分析
+  AnalysisGenerate: 'analysis:generate',
+  AnalysisExport: 'analysis:export',
   // 日志
   LogsQuery: 'logs:query',
   LogsDates: 'logs:dates',

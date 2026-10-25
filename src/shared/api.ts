@@ -49,6 +49,12 @@ export interface Api {
   getGradingStats(): Promise<GradingStatsPayload>
   onGradingEvent(cb: (e: GradingEvent) => void): () => void
 
+  // ----- 阅卷后答题分析 -----
+  /** 生成本场批改的答题情况分析报告（Markdown 全文） */
+  generateAnalysis(): Promise<string>
+  /** 导出分析报告为 Markdown 文件（返回保存路径，取消返回 null） */
+  exportAnalysis(markdown: string): Promise<string | null>
+
   // ----- 日志 -----
   queryLogs(opts: { date?: string; sessionId?: string }): Promise<LogEntry[]>
   listLogDates(): Promise<string[]>

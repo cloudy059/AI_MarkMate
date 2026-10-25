@@ -61,6 +61,8 @@ class GradingEngine {
   private paused = false
   private stats: GradingStats = freshStats()
   private lastRecord: QuestionRecord | null = null
+  /** 本次批改会话的全部记录（提交/跳过），供阅卷后答题分析使用 */
+  private sessionRecords: QuestionRecord[] = []
   /** 等待提交确认中的当前题（纠错/理由编辑的数据源） */
   private pendingRecord: QuestionRecord | null = null
   private lastHash: string | undefined
@@ -86,6 +88,11 @@ class GradingEngine {
 
   getStats(): GradingStatsPayload {
     return { stats: this.stats, state: this.state, lastRecord: this.lastRecord }
+  }
+
+  /** 本次会话全部批改记录（停止后保留，供阅卷后答题分析） */
+  getSessionRecords(): QuestionRecord[] {
+    return this.sessionRecords
   }
 
   control(action: ControlAction, value?: unknown): { ok: boolean; message?: string } {
@@ -318,6 +325,7 @@ class GradingEngine {
     this.notAdvancedStreak = 0
     this.consecutiveBlanks = 0
     this.lastRecord = null
+    this.sessionRecords = []
     this.stats = freshStats()
     this.scoreSum = 0
     this.scoreCount = 0
@@ -490,6 +498,7 @@ class GradingEngine {
       record.finishedAt = Date.now()
       this.pendingRecord = null
       this.lastRecord = record
+      this.sessionRecords.push({ ...record })
       this.stats.total += 1
       this.stats.failed += 1
       this.emit({ type: 'record', record: { ...record } })
@@ -669,6 +678,7 @@ class GradingEngine {
     record.finishedAt = Date.now()
     this.pendingRecord = null
     this.lastRecord = record
+    this.sessionRecords.push({ ...record })
     logger.info({
       phase: 'submit',
       seq,

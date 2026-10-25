@@ -21,6 +21,8 @@ const api: Api = {
 
   gradingControl: (action, value) => ipcRenderer.invoke(IPC.GradingControl, action, value),
   getGradingStats: () => ipcRenderer.invoke(IPC.GradingStats),
+  generateAnalysis: () => ipcRenderer.invoke(IPC.AnalysisGenerate),
+  exportAnalysis: (markdown) => ipcRenderer.invoke(IPC.AnalysisExport, markdown),
   onGradingEvent: (cb) => {
     const handler = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
     ipcRenderer.on(IPC.GradingEvent, handler as never)

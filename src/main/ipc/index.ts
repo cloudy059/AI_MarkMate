@@ -22,6 +22,7 @@ import { autoLocateRegions } from '@main/ai/auto-locate'
 import { captureRegion } from '@main/services/screenshot'
 import { gradingEngine, type ControlAction } from '@main/grading/state-machine'
 import { runCorrectionAnalysis, runReasonPolish } from '@main/grading/correction'
+import { runAnalysis } from '@main/grading/analysis'
 import {
   closeCorrectionWindow,
   handleOverlayCancel,
@@ -153,6 +154,23 @@ export function registerIpc(): void {
     gradingEngine.control(action as ControlAction, value)
   )
   register(IPC.GradingStats, () => gradingEngine.getStats())
+
+  // ---------------- 阅卷后答题分析 ----------------
+  register(IPC.AnalysisGenerate, safe(() => runAnalysis()))
+  register(
+    IPC.AnalysisExport,
+    safe(async (_e, markdown: string) => {
+      if (!markdown || typeof markdown !== 'string') throw new Error('报告内容为空')
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: '导出答题分析报告',
+        defaultPath: `答题分析报告-${new Date().toISOString().slice(0, 10)}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (canceled || !filePath) return null
+      fs.writeFileSync(filePath, markdown, 'utf-8')
+      return filePath
+    })
+  )
 
   // ---------------- 日志 ----------------
   register(IPC.LogsQuery, (_e, opts: { date?: string; sessionId?: string }) =>

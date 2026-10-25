@@ -9,6 +9,7 @@ import {
   Empty,
   Input,
   InputNumber,
+  Modal,
   Row,
   Segmented,
   Space,
@@ -19,6 +20,7 @@ import {
 import {
   ApartmentOutlined,
   AimOutlined,
+  BarChartOutlined,
   CheckOutlined,
   CloudServerOutlined,
   DownloadOutlined,
@@ -43,6 +45,7 @@ import { Markdown } from '@renderer/components/Markdown'
 import { SETTINGS_PAGES, normalizeSettingsPage, settingsPageByKey } from '@renderer/settings/pages'
 import { GRADING_MODE_DESC } from '@renderer/settings/pages/Workflow'
 import Hint from '@renderer/settings/Hint'
+import { unwrap } from '@renderer/utils'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -170,6 +173,35 @@ export default function SidebarApp() {
     if (!r.ok && r.message) void message.warning(r.message)
   }
 
+  // 阅卷后答题分析：生成报告 → 弹窗展示 → 可导出 Markdown
+  const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [analysisMd, setAnalysisMd] = useState('')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisExporting, setAnalysisExporting] = useState(false)
+  const doAnalysis = async () => {
+    setAnalysisLoading(true)
+    try {
+      const md = unwrap(await window.api.generateAnalysis())
+      setAnalysisMd(md)
+      setAnalysisOpen(true)
+    } catch (err: unknown) {
+      message.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAnalysisLoading(false)
+    }
+  }
+  const doExportAnalysis = async () => {
+    setAnalysisExporting(true)
+    try {
+      const p = unwrap(await window.api.exportAnalysis(analysisMd))
+      if (p) void message.success(`报告已导出至：${p}`)
+    } catch (err: unknown) {
+      message.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAnalysisExporting(false)
+    }
+  }
+
   const info = STATE_INFO[g.state] ?? STATE_INFO.idle
 
   return (
@@ -201,8 +233,8 @@ export default function SidebarApp() {
         <SettingsView page={page} onBack={() => setPage(null)} onExit={exitSettings} onNavigate={openSettingsPage} />
       ) : (
       <div className="panel-body">
-        {/* 状态卡片 */}
-        <Card size="small" styles={{ body: { padding: '10px 12px' } }}>
+        {/* 状态卡片：body 最小高度固定，避免状态切换时卡片高度跳动 */}
+        <Card size="small" styles={{ body: { padding: '10px 12px', minHeight: 72 } }}>
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space>
               <Tag color={info.color}>{info.label}</Tag>
@@ -600,6 +632,19 @@ export default function SidebarApp() {
                 <Statistic title="最高" value={g.stats.maxScore} precision={2} valueStyle={{ fontSize: 18 }} />
               </Col>
             </Row>
+            {/* 阅卷结束后生成全场答题分析报告 */}
+            {!running && g.stats.submitted > 0 && (
+              <Button
+                block
+                size="small"
+                icon={<BarChartOutlined />}
+                loading={analysisLoading}
+                onClick={() => void doAnalysis()}
+                style={{ marginTop: 8 }}
+              >
+                答题分析报告
+              </Button>
+            )}
           </Card>
         )}
 
@@ -619,6 +664,32 @@ export default function SidebarApp() {
         </Title>
       </div>
       )}
+
+      {/* 答题分析报告弹窗：Markdown 展示 + 导出 */}
+      <Modal
+        open={analysisOpen}
+        title="答题情况分析报告"
+        width={720}
+        onCancel={() => setAnalysisOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setAnalysisOpen(false)}>
+            关闭
+          </Button>,
+          <Button
+            key="export"
+            type="primary"
+            icon={<DownloadOutlined />}
+            loading={analysisExporting}
+            onClick={() => void doExportAnalysis()}
+          >
+            导出报告
+          </Button>
+        ]}
+      >
+        <div style={{ maxHeight: '62vh', overflow: 'auto', paddingRight: 4 }}>
+          <Markdown text={analysisMd} />
+        </div>
+      </Modal>
     </div>
   )
 }
