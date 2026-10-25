@@ -1,5 +1,8 @@
+import { nativeImage } from 'electron'
+import fs from 'node:fs'
 import type {
   AppConfig,
+  CorrectionApplyPayload,
   GradingEvent,
   GradingState,
   GradingStats,
@@ -15,9 +18,10 @@ import { logger } from '@main/services/logger'
 import { automation } from '@main/services/automation'
 import { captureRegion } from '@main/services/screenshot'
 import { resolveProviderRef } from '@main/ai/resolve'
+import { openCorrectionSession } from '@main/windows'
 import { BLANK_INK_RATIO, dHash, inkRatio, isSameQuestion } from './image-hash'
 import { runGrade, runOcr, type GradeOutcome } from './pipeline'
-import { normalizeScoreForConfig } from './score-parser'
+import { clampScoreForConfig, normalizeScoreForConfig } from './score-parser'
 import { sleep } from '@main/utils'
 
 class LoopAbort extends Error {
@@ -37,6 +41,8 @@ export type ControlAction =
   | 'arbiterApply'
   | 'skip'
   | 'manualScore'
+  | 'correction'
+  | 'correctionApply'
 
 interface Target {
   subQ: SubQuestion | null
@@ -55,6 +61,8 @@ class GradingEngine {
   private paused = false
   private stats: GradingStats = freshStats()
   private lastRecord: QuestionRecord | null = null
+  /** 等待提交确认中的当前题（纠错/理由编辑的数据源） */
+  private pendingRecord: QuestionRecord | null = null
   private lastHash: string | undefined
   /** 连续「页面未翻页」暂停次数：达到 3 次自动暂停批改，等待人工处理 */
   private notAdvancedStreak = 0
@@ -118,8 +126,51 @@ class GradingEngine {
       case 'manualScore':
         this.resolveWaiter({ score: value })
         return { ok: true }
+      case 'correction':
+        return this.openCorrection()
+      case 'correctionApply':
+        this.resolveWaiter({ correction: value })
+        return { ok: true }
       default:
         return { ok: false, message: `未知指令：${action}` }
+    }
+  }
+
+  /** 试改模式纠错：打开纠错面板（不解除等待，面板经 correctionApply 回传结果） */
+  private openCorrection(): { ok: boolean; message?: string } {
+    if (this.state !== 'awaiting_submit') return { ok: false, message: '仅试改模式评分后可纠错' }
+    const rec = this.pendingRecord
+    if (!rec) return { ok: false, message: '当前无可纠错的评分记录' }
+    const cfg = configStore.get()
+    // 答题卡原图优先（captures 目录），缺失时回退缩略预览
+    let captureDataUrl = rec.previewDataUrl ?? ''
+    try {
+      const p = logger.capturePath(rec.sessionId, rec.seq)
+      if (fs.existsSync(p)) {
+        const img = nativeImage.createFromPath(p)
+        if (!img.isEmpty()) captureDataUrl = img.toDataURL()
+      }
+    } catch {
+      /* 回退预览图 */
+    }
+    openCorrectionSession({
+      record: { ...rec },
+      captureDataUrl,
+      scoreConfig: cfg.scoreConfig,
+      subQuestions: cfg.subQuestions.filter((s) => s.enabled),
+      standardName: cfg.scoringStandards[cfg.activeStandardIndex]?.name ?? ''
+    })
+    return { ok: true }
+  }
+
+  /** 纠错窗口被主动关闭（未提交）：仍在等待提交时提醒教师修改尚未生效 */
+  notifyCorrectionClosed(): void {
+    if (this.state === 'awaiting_submit') {
+      this.emit({
+        type: 'error',
+        message: '纠错窗口已关闭：修改尚未提交，如需纠错请在侧边栏重新打开',
+        recoverable: false
+      })
     }
   }
 
@@ -437,6 +488,7 @@ class GradingEngine {
     const skipQuestion = async (): Promise<void> => {
       record.submitStatus = 'skipped'
       record.finishedAt = Date.now()
+      this.pendingRecord = null
       this.lastRecord = record
       this.stats.total += 1
       this.stats.failed += 1
@@ -504,7 +556,7 @@ class GradingEngine {
               const r = await this.waitUser('arbitrate')
               if (r === 'stop') throw new LoopAbort()
               if (r === 'reject' || r === 'skip') return skipQuestion()
-              f = normalizeScoreForConfig((r as { score: number }).score, configStore.get().scoreConfig, boxes[i].subQ)
+              f = clampScoreForConfig((r as { score: number }).score, configStore.get().scoreConfig, boxes[i].subQ)
               arb = true
             } else {
               f = normalizeScoreForConfig((scoresA[i] + scoresB[i]) / 2, configStore.get().scoreConfig, boxes[i].subQ)
@@ -524,7 +576,8 @@ class GradingEngine {
         scoreA: scoresA?.[i],
         scoreB: scoresB?.[i],
         finalScore: finals?.[i],
-        arbited: arbitedFlags[i]
+        arbited: arbitedFlags[i],
+        reason: a.parse.subReasons?.[i]
       })
     })
     record.finalScore = Number((finals as number[]).reduce((s, v) => s + v, 0).toFixed(2))
@@ -533,14 +586,25 @@ class GradingEngine {
       record.scoreB = record.subScores[0]?.scoreB
       record.arbited = record.subScores[0]?.arbited
     }
+    // 评分理由（Markdown）：分小题时按小题汇总，整题取模型 reason
+    record.reasoning = subQs.length
+      ? boxes.map((b, i) => `**${b.label}**：${a.parse.subReasons?.[i] ?? `AI 给 ${finals?.[i] ?? '?'} 分`}`).join('\n\n')
+      : a.parse.reason
 
     // ---- 4) 等待提交：试改需人工确认；无人值守/双评倒计时可自定义（无人默认 0 秒，双评默认 5 秒，0 = 立即提交）
     this.setState('awaiting_submit')
+    this.pendingRecord = record
+    this.emit({ type: 'record', record: { ...record } })
+    // 试改模式：每份自动弹出纠错窗口（提交确认按钮已集成在窗口内）
+    if (gradingMode === 'trial') this.openCorrection()
     let submitDecision: 'submit' | 'skip' = 'submit'
     if (gradingMode === 'trial') {
       const r = await this.waitUser('confirm')
       if (r === 'stop') throw new LoopAbort()
       if (r === 'reject' || r === 'skip') submitDecision = 'skip'
+      else if (r && typeof r === 'object' && 'correction' in r) {
+        this.applyCorrection(record, boxes, finals as number[], (r as { correction: CorrectionApplyPayload }).correction)
+      }
     } else {
       const waitSec =
         gradingMode === 'unattended'
@@ -603,8 +667,15 @@ class GradingEngine {
     if (submitRegion) await automation.clickRegion(submitRegion)
     record.submitStatus = gradingMode === 'trial' ? 'manual' : 'auto'
     record.finishedAt = Date.now()
+    this.pendingRecord = null
     this.lastRecord = record
-    logger.info({ phase: 'submit', seq, finalScore: record.finalScore, state: 'submitted', detail: `第 ${seq} 题已提交，得分 ${record.finalScore}` })
+    logger.info({
+      phase: 'submit',
+      seq,
+      finalScore: record.finalScore,
+      state: 'submitted',
+      detail: `第 ${seq} 题已提交，得分 ${record.finalScore}${record.reasoning ? `；评分理由：${record.reasoning.slice(0, 500)}` : ''}`
+    })
 
     this.stats.total += 1
     this.stats.submitted += 1
@@ -620,6 +691,60 @@ class GradingEngine {
     // ---- 6) 等待翻页 ----
     this.setState('waiting_next', `等待下一题（${Math.round(configStore.get().workflow.nextDelayMs / 1000)} 秒）…`)
     await sleep(configStore.get().workflow.nextDelayMs)
+  }
+
+  /** 应用纠错结果：教师修正分覆盖 AI 分、理由记入历史、按需更新评分标准 */
+  private applyCorrection(
+    record: QuestionRecord,
+    boxes: Target[],
+    finals: number[],
+    c: CorrectionApplyPayload
+  ): void {
+    const seq = record.seq
+    if (
+      !c ||
+      !Array.isArray(c.scores) ||
+      c.scores.length !== boxes.length ||
+      c.scores.some((v) => typeof v !== 'number' || !Number.isFinite(v))
+    ) {
+      logger.warn({ phase: 'correction', seq, error: '纠错数据不合法，忽略' })
+      return
+    }
+    const aiTotal = record.finalScore
+    for (let i = 0; i < boxes.length; i++) {
+      const v = clampScoreForConfig(c.scores[i], configStore.get().scoreConfig, boxes[i].subQ)
+      finals[i] = v
+      if (record.subScores[i]) record.subScores[i].finalScore = v
+    }
+    // 分小题：总分默认求和，教师手动覆盖时以覆盖值为准（阅卷平台总分框）
+    const sum = Number(finals.reduce((s, v) => s + v, 0).toFixed(2))
+    record.finalScore =
+      typeof c.totalScoreOverride === 'number' && Number.isFinite(c.totalScoreOverride) ? c.totalScoreOverride : sum
+    if (typeof c.reasoning === 'string' && c.reasoning.trim()) record.reasoning = c.reasoning
+    record.corrected = true
+    logger.info({
+      phase: 'correction',
+      seq,
+      finalScore: record.finalScore,
+      detail:
+        `教师纠错：AI ${aiTotal} 分 → 教师 ${record.finalScore} 分（小题 ${finals.join(' / ')}）；` +
+        `理由：${(c.reasoning || '（未填写）').slice(0, 500)}${c.standardUpdates ? '；同步更新评分标准' : '；仅修改分数'}`
+    })
+    // 第二步确认的评分标准优化：写入当前启用的评分标准
+    const upd = c.standardUpdates
+    if (upd && (upd.referenceAnswer?.trim() || upd.rubric?.trim())) {
+      const cfg = configStore.get()
+      const idx = cfg.activeStandardIndex
+      const std = cfg.scoringStandards[idx]
+      if (std) {
+        const next = { ...std }
+        if (upd.referenceAnswer?.trim()) next.referenceAnswer = upd.referenceAnswer
+        if (upd.rubric?.trim()) next.rubric = upd.rubric
+        configStore.patch({ scoringStandards: cfg.scoringStandards.map((s, i) => (i === idx ? next : s)) })
+        logger.info({ phase: 'correction', seq, detail: `已更新评分标准「${std.name}」的参考答案/评分标准` })
+        this.emit({ type: 'error', message: `已按纠错分析更新评分标准「${std.name}」`, recoverable: false })
+      }
+    }
   }
 
   /** 解析失败人工兜底：按小题顺序返回各框归一化分数，或 'skip' 跳过整题 */
@@ -653,7 +778,7 @@ class GradingEngine {
       // 输入不合法：继续等待
       return this.askManualScores(seq, boxes, outcome)
     }
-    return arr.map((v, i) => normalizeScoreForConfig(v, configStore.get().scoreConfig, boxes[i].subQ))
+    return arr.map((v, i) => clampScoreForConfig(v, configStore.get().scoreConfig, boxes[i].subQ))
   }
 }
 

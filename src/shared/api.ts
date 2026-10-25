@@ -2,6 +2,10 @@ import type {
   AppConfig,
   AdjustBox,
   AutoLocateResult,
+  CorrectionAnalyzeRequest,
+  CorrectionAnalysisSections,
+  CorrectionInitPayload,
+  CorrectionStreamEvent,
   DeepPartial,
   GenerateRubricRequest,
   GradingEvent,
@@ -82,4 +86,16 @@ export interface Api {
   overlayAdjustSubmit(map: Record<string, Rect>): void
   /** 调整层数据推送（主进程 → overlay 渲染层）；preload 内置缓存，先到后注册不丢消息 */
   onOverlayInit(cb: (data: { bounds: { x: number; y: number; width: number; height: number }; boxes: AdjustBox[] }) => void): void
+
+  // ----- AI 纠错（仅 correction 窗口调用） -----
+  /** 启动 AI 差异分析（流式，经 onCorrectionStream 推送增量） */
+  correctionAnalyze(req: CorrectionAnalyzeRequest): Promise<{ ok: boolean; sections?: CorrectionAnalysisSections; error?: string }>
+  /** AI 润色评分理由（流式，经 onCorrectionStream 推送增量） */
+  correctionPolish(text: string, record: QuestionRecord): Promise<{ ok: boolean; text?: string; error?: string }>
+  /** 纠错面板初始化数据（主进程推送；preload 内置缓存） */
+  onCorrectionInit(cb: (data: CorrectionInitPayload) => void): void
+  /** 分析/润色流式增量 */
+  onCorrectionStream(cb: (e: CorrectionStreamEvent) => void): () => void
+  /** 关闭纠错窗口 */
+  closeCorrection(): void
 }

@@ -254,6 +254,8 @@ export interface SubScore {
   scoreB?: number
   finalScore?: number
   arbited?: boolean
+  /** 该小题评分理由（AI 给出或教师补充） */
+  reason?: string
 }
 
 export interface QuestionRecord {
@@ -269,6 +271,10 @@ export interface QuestionRecord {
   arbited?: boolean
   /** 分小题时各小题得分 */
   subScores: SubScore[]
+  /** 评分理由（Markdown，AI 给出、可经教师编辑） */
+  reasoning?: string
+  /** 经教师纠错修正过分数 */
+  corrected?: boolean
   imageHash?: string
   /** 缩略预览图 dataURL（仅发送侧边栏展示，不入日志） */
   previewDataUrl?: string
@@ -325,6 +331,55 @@ export interface LogEntry {
   detail?: string
 }
 
+// ---------- AI 纠错（试改模式） ----------
+/** 纠错面板初始化数据（主进程 → 纠错窗口） */
+export interface CorrectionInitPayload {
+  record: QuestionRecord
+  /** 答题卡原始截图（大图 dataURL，缩略图缺失时回退 record.previewDataUrl） */
+  captureDataUrl: string
+  scoreConfig: ScoreConfig
+  /** 已启用的小题（分小题模式） */
+  subQuestions: SubQuestion[]
+  standardName: string
+}
+
+/** 纠错第一步教师反馈 → AI 分析请求 */
+export interface CorrectionAnalyzeRequest {
+  record: QuestionRecord
+  /** 教师修正分（对齐小题顺序；单题为 1 个元素） */
+  teacherScores: number[]
+  /** 教师评分理由（可选） */
+  reasoning: string
+}
+
+/** AI 分析结果按固定小节切分 */
+export interface CorrectionAnalysisSections {
+  /** 差异原因分析 */
+  reason: string
+  /** 优化后的参考答案（无需修改时为空） */
+  newReferenceAnswer: string
+  /** 优化后的评分标准（无需修改时为空） */
+  newRubric: string
+}
+
+/** 纠错面板流式事件（M→R） */
+export interface CorrectionStreamEvent {
+  kind: 'analyze' | 'polish'
+  delta: string
+}
+
+/** 纠错确认提交（correctionApply 指令参数） */
+export interface CorrectionApplyPayload {
+  /** 修正分数（对齐小题顺序；单题为 1 个元素） */
+  scores: number[]
+  /** 最终评分理由（Markdown，随分数提交并记入历史） */
+  reasoning: string
+  /** 分小题模式下的总分手动覆盖（缺省 = 各小题之和） */
+  totalScoreOverride?: number
+  /** 第二步确认后的评分标准更新（仅修改分数时为空） */
+  standardUpdates?: { referenceAnswer?: string; rubric?: string } | null
+}
+
 // ---------- IPC 通道名 ----------
 export const IPC = {
   // 配置
@@ -376,7 +431,13 @@ export const IPC = {
   OverlayInit: 'overlay:init',
   OverlayAdjustSubmit: 'overlay:adjustSubmit',
   // 设置窗口导航
-  SettingsNavigate: 'settings:navigate'
+  SettingsNavigate: 'settings:navigate',
+  // AI 纠错面板
+  CorrectionInit: 'correction:init',
+  CorrectionStream: 'correction:stream',
+  CorrectionAnalyze: 'correction:analyze',
+  CorrectionPolish: 'correction:polish',
+  CorrectionClose: 'correction:close'
 } as const
 
 /** 深度部分类型（patch 配置用；数组整体替换） */

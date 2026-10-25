@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   Divider,
   Empty,
   Input,
@@ -17,9 +18,12 @@ import {
 } from 'antd'
 import {
   ApartmentOutlined,
+  AimOutlined,
   CheckOutlined,
   CloudServerOutlined,
   DownloadOutlined,
+  DownOutlined,
+  ExperimentOutlined,
   FileTextOutlined,
   HomeOutlined,
   LeftOutlined,
@@ -35,6 +39,7 @@ import {
 import type { GradingState, WorkflowConfig } from '@shared/types'
 import { useConfigStore } from '@renderer/stores/config'
 import { useGradingStore } from '@renderer/stores/grading'
+import { Markdown } from '@renderer/components/Markdown'
 import { SETTINGS_PAGES, normalizeSettingsPage, settingsPageByKey } from '@renderer/settings/pages'
 import { GRADING_MODE_DESC } from '@renderer/settings/pages/Workflow'
 import Hint from '@renderer/settings/Hint'
@@ -67,6 +72,15 @@ export default function SidebarApp() {
   const { message } = AntdApp.useApp()
   const [manualScore, setManualScore] = useState('')
   const [arbScore, setArbScore] = useState<number | null>(null)
+  // 前期设置卡片收起状态（跨会话持久化）
+  const [setupCollapsed, setSetupCollapsed] = useState<boolean>(
+    () => localStorage.getItem('setup-collapsed') === '1'
+  )
+  const toggleSetup = () =>
+    setSetupCollapsed((v) => {
+      localStorage.setItem('setup-collapsed', v ? '0' : '1')
+      return !v
+    })
   // 仲裁偏向统计：人工仲裁分更接近哪个模型就给哪方 +1；某方领先 ≥2 次后，建议值改为该模型分数
   const arbBiasRef = useRef<{ A: number; B: number }>({ A: 0, B: 0 })
   // 设置视图：showSettings=是否在设置视图；page=null 为设置菜单，否则为具体设置页 key
@@ -211,22 +225,32 @@ export default function SidebarApp() {
           </Space>
         </Card>
 
-        {/* 前期设置入口：直达各设置分区 */}
-        <Card size="small" title="前期设置" styles={{ body: { padding: '8px 10px' } }}>
-          <div className="setup-links">
-            <Button icon={<CloudServerOutlined />} onClick={() => openSettingsPage('models:providers')}>
-              AI 服务商
-            </Button>
-            <Button icon={<ApartmentOutlined />} onClick={() => openSettingsPage('models:workflow')}>
-              模型与规则
-            </Button>
-            <Button icon={<FileTextOutlined />} onClick={() => openSettingsPage('marking:standards')}>
-              评分标准
-            </Button>
-            <Button icon={<SelectOutlined />} onClick={() => openSettingsPage('marking:regions')}>
-              答题区域
-            </Button>
-          </div>
+        {/* 前期设置入口：直达各设置分区（可收起，状态记忆） */}
+        <Card
+          size="small"
+          title={
+            <span onClick={toggleSetup} style={{ cursor: 'pointer', userSelect: 'none' }}>
+              {setupCollapsed ? <RightOutlined /> : <DownOutlined />} 前期设置
+            </span>
+          }
+          styles={{ body: { padding: setupCollapsed ? 0 : '8px 10px' } }}
+        >
+          {!setupCollapsed && (
+            <div className="setup-links">
+              <Button icon={<CloudServerOutlined />} onClick={() => openSettingsPage('models:providers')}>
+                AI 服务商
+              </Button>
+              <Button icon={<ApartmentOutlined />} onClick={() => openSettingsPage('models:workflow')}>
+                模型与规则
+              </Button>
+              <Button icon={<FileTextOutlined />} onClick={() => openSettingsPage('marking:standards')}>
+                评分标准
+              </Button>
+              <Button icon={<SelectOutlined />} onClick={() => openSettingsPage('marking:regions')}>
+                答题区域
+              </Button>
+            </div>
+          )}
         </Card>
 
         {/* 批改模式（高频切换） */}
@@ -310,11 +334,12 @@ export default function SidebarApp() {
             <InputNumber
               value={wf.plannedCount || undefined}
               onChange={(v) => saveWf({ plannedCount: Number(v) || 0 })}
-              min={1}
+              min={0}
               max={9999}
               step={1}
               addonAfter="份"
               placeholder="不限"
+              title="0 或留空 = 不限份数"
               style={{ width: 66 }}
             />
           )}
@@ -347,21 +372,44 @@ export default function SidebarApp() {
           )}
         </Space>
 
-        {/* 等待提交（试改=人工确认；无人值守/双评=可立即提交） */}
+        {/* 等待提交（试改=纠错窗口自动弹出并在其中提交；无人值守/双评=可立即提交） */}
         {g.state === 'awaiting_submit' && (
           <Card size="small" title="提交确认" styles={{ body: { padding: '8px 12px' } }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {gradingMode === 'trial' && (
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  试改模式：请核对得分后确认提交
-                </Text>
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              {gradingMode === 'trial' ? (
+                <>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    试改模式：请在纠错窗口中核对得分并提交（窗口已自动弹出，误关闭可重新打开）
+                  </Text>
+                  <Button icon={<ExperimentOutlined />} onClick={() => void g.control('correction')}>
+                    打开纠错窗口
+                  </Button>
+                  {g.lastRecord?.reasoning && (
+                    <Collapse
+                      size="small"
+                      ghost
+                      items={[
+                        {
+                          key: 'reason',
+                          label: <span style={{ fontSize: 12 }}>评分理由</span>,
+                          children: <Markdown text={g.lastRecord.reasoning} />
+                        }
+                      ]}
+                    />
+                  )}
+                </>
+              ) : (
+                <Space wrap>
+                  <Button
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    onClick={() => void g.control('confirm')}
+                  >
+                    立即提交
+                  </Button>
+                  <Button onClick={() => void g.control('reject')}>不提交（跳过）</Button>
+                </Space>
               )}
-              <Space>
-                <Button type="primary" icon={<CheckOutlined />} onClick={() => void g.control('confirm')}>
-                  {gradingMode === 'trial' ? '确认提交' : '立即提交'}
-                </Button>
-                <Button onClick={() => void g.control('reject')}>不提交（跳过）</Button>
-              </Space>
             </Space>
           </Card>
         )}
@@ -397,6 +445,7 @@ export default function SidebarApp() {
                   min={scoreCfg.min}
                   max={scoreCfg.max}
                   step={scoreCfg.step}
+                  precision={2}
                   style={{ width: 110 }}
                   addonAfter="分"
                 />
@@ -506,6 +555,24 @@ export default function SidebarApp() {
                   {g.lastRecord.ocrText}
                 </Paragraph>
               )}
+              {(g.lastRecord.submitStatus === 'auto' || g.lastRecord.submitStatus === 'manual') &&
+                g.lastRecord.reasoning && (
+                  <Collapse
+                    size="small"
+                    ghost
+                    items={[
+                      {
+                        key: 'reason',
+                        label: (
+                          <span style={{ fontSize: 12 }}>
+                            评分理由{g.lastRecord.corrected ? '（含纠错）' : ''}
+                          </span>
+                        ),
+                        children: <Markdown text={g.lastRecord.reasoning} />
+                      }
+                    ]}
+                  />
+                )}
             </Space>
           </Card>
         )}

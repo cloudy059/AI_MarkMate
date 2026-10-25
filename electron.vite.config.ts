@@ -43,7 +43,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           sidebar: resolve('src/renderer/sidebar/index.html'),
-          overlay: resolve('src/renderer/overlay/index.html')
+          overlay: resolve('src/renderer/overlay/index.html'),
+          correction: resolve('src/renderer/correction/index.html')
         }
       }
     }

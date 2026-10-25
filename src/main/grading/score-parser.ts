@@ -6,6 +6,8 @@ export interface ParseResult {
   /** 分小题模式：按 subQs 顺序的归一化分数 */
   scores?: number[]
   reason?: string
+  /** 分小题模式：按 subQs 顺序的各小题评分依据（该小题无理由时为 undefined） */
+  subReasons?: (string | undefined)[]
   error?: string
   /** 归一化前的原始提取值 */
   rawValue?: number
@@ -87,9 +89,10 @@ function normalizeScore(v: number, cfg: ScoreConfig): number {
   const step = cfg.step > 0 ? cfg.step : 1
   let snapped = min + Math.round((v - min) / step) * step
   snapped = Math.max(min, Math.min(max, snapped))
-  // 消除浮点误差（如 0.30000000000000004）
-  const decimals = Math.max(0, Math.ceil(-Math.log10(step)))
-  return Number(snapped.toFixed(Math.min(decimals, 4)))
+  // 消除浮点误差（如 0.30000000000000004）：保留位数取步长自身的小数位数
+  // 注意不能用 ceil(-log10(step))：step=1.5 时会算出 0 位，把 4.5 舍成 5
+  const decimals = Math.min((String(step).split('.')[1] ?? '').length, 4)
+  return Number(snapped.toFixed(decimals))
 }
 
 /** 对外：按主/小题配置归一化人工给分 */
@@ -98,6 +101,14 @@ export function normalizeScoreForConfig(v: number, cfg: ScoreConfig, subQ: SubQu
     ? { total: subQ.maxScore, min: subQ.minScore, max: subQ.maxScore, step: subQ.step }
     : cfg
   return normalizeScore(v, effective)
+}
+
+/** 对外：教师权威输入（纠错/人工给分/仲裁）只夹取到 [min, max]，不做步长量化——教师明确给出的分数不应被静默改写 */
+export function clampScoreForConfig(v: number, cfg: ScoreConfig, subQ: SubQuestion | null): number {
+  const min = subQ ? Math.min(subQ.minScore, subQ.maxScore) : Math.min(cfg.min, cfg.max)
+  const max = subQ ? Math.max(subQ.minScore, subQ.maxScore) : Math.max(cfg.min, cfg.max)
+  const clamped = Math.max(min, Math.min(max, v))
+  return Number(clamped.toFixed(4))
 }
 
 /**
@@ -173,6 +184,18 @@ function pickSubName(v: unknown): string | undefined {
   return undefined
 }
 
+/** 提取 scores 数组元素的评分依据 */
+function pickSubReason(v: unknown): string | undefined {
+  if (v && typeof v === 'object') {
+    const rec = v as Record<string, unknown>
+    for (const k of ['reason', 'Reason', '理由', '依据', '评分依据']) {
+      const s = rec[k]
+      if (typeof s === 'string' && s.trim()) return s.trim()
+    }
+  }
+  return undefined
+}
+
 /**
  * 分小题模式解析：期望 {"scores":[{"name":"小题1","score":4}, ...]} 或 {"scores":[4,3,2]}。
  * 先按小题名称对位，缺失的按顺序补齐；每个分数按各自小题配置归一化。
@@ -186,12 +209,16 @@ export function parseSubScores(raw: string, subQs: SubQuestion[]): ParseResult {
     const arr = (o as Record<string, unknown>)['scores']
     if (!Array.isArray(arr) || !arr.length) continue
     const byName = new Map<string, number>()
+    const reasonByName = new Map<string, string>()
     arr.forEach((v) => {
       const name = pickSubName(v)
       const score = pickSubScore(v)
       if (name && score !== undefined) byName.set(name, score)
+      const r = pickSubReason(v)
+      if (name && r) reasonByName.set(name, r)
     })
     const ordered = arr.map((v) => pickSubScore(v))
+    const orderedReasons = arr.map((v) => pickSubReason(v))
     const scores = subQs.map((sq, idx) => {
       const named = byName.get(sq.name)
       const byIdx = ordered[idx]
@@ -201,10 +228,12 @@ export function parseSubScores(raw: string, subQs: SubQuestion[]): ParseResult {
     const normalized = scores.map((v, idx) =>
       normalizeScoreForConfig(v as number, { total: subQs[idx].maxScore, min: 0, max: subQs[idx].maxScore, step: 1 }, subQs[idx])
     )
+    const subReasons = subQs.map((sq, idx) => reasonByName.get(sq.name) ?? orderedReasons[idx])
     return {
       ok: true,
       scores: normalized,
-      reason: `小题分解析成功：${normalized.join(' / ')}`
+      reason: `小题分解析成功：${normalized.join(' / ')}`,
+      subReasons
     }
   }
   return {

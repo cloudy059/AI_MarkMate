@@ -5,6 +5,7 @@ import {
   IPC,
   type AdjustBox,
   type AppConfig,
+  type CorrectionAnalyzeRequest,
   type GenerateRubricRequest,
   type LanNode,
   type LogEntry,
@@ -20,7 +21,9 @@ import { buildThinkingParams } from '@main/ai/registry'
 import { autoLocateRegions } from '@main/ai/auto-locate'
 import { captureRegion } from '@main/services/screenshot'
 import { gradingEngine, type ControlAction } from '@main/grading/state-machine'
+import { runCorrectionAnalysis, runReasonPolish } from '@main/grading/correction'
 import {
+  closeCorrectionWindow,
   handleOverlayCancel,
   handleOverlaySubmit,
   handleOverlayAdjustSubmit,
@@ -335,6 +338,36 @@ export function registerIpc(): void {
       return res.text
     })
   )
+
+  // ---------------- AI 纠错面板 ----------------
+  register(
+    IPC.CorrectionAnalyze,
+    safe(async (e: IpcMainInvokeEvent, req: CorrectionAnalyzeRequest) => {
+      if (!req || !req.record || !Array.isArray(req.teacherScores)) throw new Error('纠错分析参数不完整')
+      const sender = e.sender
+      const { sections } = await runCorrectionAnalysis(req, (delta) => {
+        if (!sender.isDestroyed()) sender.send(IPC.CorrectionStream, { kind: 'analyze', delta })
+      })
+      return { ok: true, sections }
+    })
+  )
+  register(
+    IPC.CorrectionPolish,
+    safe(async (e: IpcMainInvokeEvent, text: string, record: { seq?: number }) => {
+      if (typeof text !== 'string' || !text.trim()) throw new Error('无评分理由可润色')
+      const sender = e.sender
+      const out = await runReasonPolish(text, record?.seq ?? 0, (delta) => {
+        if (!sender.isDestroyed()) sender.send(IPC.CorrectionStream, { kind: 'polish', delta })
+      })
+      return { ok: true, text: out }
+    })
+  )
+  register(IPC.CorrectionClose, () => {
+    const wasAwaiting = gradingEngine.getState() === 'awaiting_submit'
+    closeCorrectionWindow()
+    if (wasAwaiting) gradingEngine.notifyCorrectionClosed()
+    return true
+  })
 
   // ---------------- Overlay ----------------
   register(IPC.OverlaySubmit, (e: IpcMainInvokeEvent, payload: { rect?: unknown; point?: unknown }) => {

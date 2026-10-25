@@ -1,0 +1,274 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #f0f2f5;
+  overflow: hidden;
+  font-family:
+    -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.title-bar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  color: #fff;
+  cursor: move;
+  flex: none;
+}
+
+.title-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title-bar .bar-btn {
+  -webkit-app-region: no-drag;
+  border: none;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.title-bar .bar-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+/* 第一步：左图右表单 */
+.feedback-layout {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.img-pane {
+  flex: 1.15;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.img-pane img {
+  width: 100%;
+  display: block;
+}
+
+.form-pane {
+  flex: 1;
+  min-width: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-pane::-webkit-scrollbar {
+  width: 6px;
+}
+
+.form-pane::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.sub-score-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sub-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 评分理由编辑器：左编辑右预览（窄窗口自动上下堆叠） */
+.reason-editor {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  align-items: stretch;
+}
+
+.reason-editor .reason-edit-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reason-editor .reason-preview-col {
+  flex: 1;
+  min-width: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.reason-editor .reason-preview-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.reason-editor .reason-preview-col::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+/* 第二步：流式分析 */
+.analysis-stream {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding: 4px 4px 12px;
+}
+
+.analysis-stream::-webkit-scrollbar {
+  width: 6px;
+}
+
+.analysis-stream::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.stream-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #1677ff;
+  border-radius: 1px;
+  animation: cursor-blink 1s step-start infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.analysis-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+/* 第三步：审核布局 */
+.review-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.md-body {
+  font-size: 13px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.md-body p {
+  margin: 0 0 6px;
+}
+
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  margin: 10px 0 6px;
+  font-size: 15px;
+}
+
+.md-body ul,
+.md-body ol {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+
+.md-body code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.md-body pre {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 8px 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.md-body img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.md-body table {
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+
+.md-body th,
+.md-body td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.md-empty {
+  color: #bbb;
+  font-size: 12px;
+}

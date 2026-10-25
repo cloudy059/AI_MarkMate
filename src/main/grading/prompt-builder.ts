@@ -50,8 +50,9 @@ export function buildGradingSystemPrompt(ctx: GradingPromptContext): string {
   lines.push(`只输出一个 JSON 对象，不要 markdown 代码块，不要多余文字。`)
   if (subs.length) {
     lines.push(`本题包含 ${subs.length} 个小题，需分别给分，格式：`)
-    lines.push(`{"scores": [{"name": "<小题名称>", "score": <数字>}, ...]}`)
+    lines.push(`{"scores": [{"name": "<小题名称>", "score": <数字>, "reason": "<该小题评分依据，60字以内>"}, ...]}`)
     lines.push(`scores 数组必须包含且仅包含全部 ${subs.length} 个小题，name 与下方小题名称完全一致。`)
+    lines.push(`reason 为该小题的评分依据，简明扼要。`)
     lines.push(`各小题给分要求：`)
     subs.forEach((sq, i) => {
       lines.push(`${i + 1}. ${sq.name}：${formatScoreRange({ total: sq.maxScore, min: sq.minScore, max: sq.maxScore, step: sq.step })}`)

@@ -1,6 +1,14 @@
 import { BrowserWindow, app, screen } from 'electron'
 import path from 'node:path'
-import { IPC, type AdjustBox, type GradingEvent, type Rect, type Region, type RegionKind } from '@shared/types'
+import {
+  IPC,
+  type AdjustBox,
+  type CorrectionInitPayload,
+  type GradingEvent,
+  type Rect,
+  type Region,
+  type RegionKind
+} from '@shared/types'
 import { configStore } from '@main/services/config-store'
 import { automation } from '@main/services/automation'
 
@@ -10,6 +18,7 @@ import { automation } from '@main/services/automation'
 
 let sidebarWindow: BrowserWindow | null = null
 let overlayWindows: BrowserWindow[] = []
+let correctionWindow: BrowserWindow | null = null
 
 /** Windows 下窗口图标（resources/icon.ico） */
 function winIcon(): string | undefined {
@@ -137,6 +146,55 @@ export function openSettings(page?: string): void {
   // 新建窗口时页面尚未加载完成，等 load 结束再发导航事件
   if (target.webContents.isLoading()) target.webContents.once('did-finish-load', send)
   else send()
+}
+
+// ---------------- AI 纠错面板 ----------------
+
+/**
+ * 打开（或复用）纠错面板并推送初始化数据。
+ * 窗口关闭不解除状态机等待：面板经 gradingControl('correctionApply') 回传结果，关闭即回到侧边栏确认框。
+ */
+export function openCorrectionSession(payload: CorrectionInitPayload): void {
+  let win = correctionWindow
+  if (!win || win.isDestroyed()) {
+    const primary = screen.getPrimaryDisplay()
+    win = new BrowserWindow({
+      width: 980,
+      height: 700,
+      minWidth: 820,
+      minHeight: 560,
+      frame: false,
+      resizable: true,
+      alwaysOnTop: true,
+      skipTaskbar: false,
+      fullscreenable: false,
+      icon: winIcon(),
+      webPreferences: webPrefs()
+    })
+    correctionWindow = win
+    win.setAlwaysOnTop(true, 'floating')
+    const area = primary.workArea
+    win.setPosition(Math.round(area.x + area.width / 2 - 490), Math.round(area.y + area.height / 2 - 350))
+    loadRenderer(win, 'correction')
+    win.on('closed', () => {
+      correctionWindow = null
+    })
+  }
+  const target = win
+  const send = () => {
+    if (!target.isDestroyed()) target.webContents.send(IPC.CorrectionInit, payload)
+  }
+  // 新建窗口时页面尚未加载完成，等 load 结束再发（preload 侧另有缓存兜底）
+  if (target.webContents.isLoading()) target.webContents.once('did-finish-load', send)
+  else send()
+  if (!target.isVisible()) target.show()
+  target.focus()
+}
+
+/** 关闭纠错面板（教师点右上角 × 或完成应用后调用） */
+export function closeCorrectionWindow(): void {
+  if (correctionWindow && !correctionWindow.isDestroyed()) correctionWindow.close()
+  correctionWindow = null
 }
 
 // ---------------- 标记 Overlay ----------------

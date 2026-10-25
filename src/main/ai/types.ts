@@ -28,6 +28,8 @@ export interface AiAdapter {
   baseUrl: string
   apiKey: string
   chat(req: ChatRequest): Promise<ChatResponse>
+  /** 流式对话：增量回调 onDelta，返回完整文本 */
+  chatStream(req: ChatRequest, onDelta: (delta: string) => void): Promise<string>
   listModels(): Promise<string[]>
 }
 

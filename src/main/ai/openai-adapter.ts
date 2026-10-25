@@ -41,16 +41,7 @@ export class OpenAiAdapter implements AiAdapter {
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const t0 = Date.now()
-    const userContent: unknown = req.imageDataUrls?.length
-      ? [
-          { type: 'text', text: req.prompt },
-          ...req.imageDataUrls.map((u) => ({ type: 'image_url', image_url: { url: u } }))
-        ]
-      : req.prompt
-    const messages = [
-      ...(req.system ? [{ role: 'system', content: req.system }] : []),
-      { role: 'user', content: userContent }
-    ]
+    const messages = this.buildMessages(req)
     const body: Record<string, unknown> = {
       model: req.model,
       messages,
@@ -88,6 +79,102 @@ export class OpenAiAdapter implements AiAdapter {
       model: req.model,
       raw: data
     }
+  }
+
+  /** 构造 OpenAI 协议 messages 数组 */
+  private buildMessages(req: ChatRequest): unknown[] {
+    const userContent: unknown = req.imageDataUrls?.length
+      ? [
+          { type: 'text', text: req.prompt },
+          ...req.imageDataUrls.map((u) => ({ type: 'image_url', image_url: { url: u } }))
+        ]
+      : req.prompt
+    return [
+      ...(req.system ? [{ role: 'system', content: req.system }] : []),
+      { role: 'user', content: userContent }
+    ]
+  }
+
+  /** 流式对话：SSE data: 行增量解析 choices[0].delta.content */
+  async chatStream(req: ChatRequest, onDelta: (delta: string) => void): Promise<string> {
+    const body: Record<string, unknown> = {
+      model: req.model,
+      messages: this.buildMessages(req),
+      stream: true,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+      ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
+      ...(req.extra ?? {})
+    }
+    const controller = new AbortController()
+    // 空闲超时：每收到数据即重置（长分析不受总时长限制，只防卡死）
+    let timer = setTimeout(() => controller.abort(), req.timeoutMs)
+    const resetIdle = (): void => {
+      clearTimeout(timer)
+      timer = setTimeout(() => controller.abort(), req.timeoutMs)
+    }
+    let res: Response
+    try {
+      res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(body),
+        signal: controller.signal
+      })
+    } catch (err) {
+      clearTimeout(timer)
+      throw new AiError(err instanceof Error && err.name === 'AbortError' ? `请求超时（${req.timeoutMs}ms）` : `网络错误：${err instanceof Error ? err.message : String(err)}`)
+    }
+    if (!res.ok) {
+      clearTimeout(timer)
+      const text = await res.text().catch(() => '')
+      throw new AiError(`HTTP ${res.status}`, res.status, text.slice(0, 600))
+    }
+    const reader = res.body?.getReader()
+    if (!reader) {
+      clearTimeout(timer)
+      throw new AiError('响应无内容流')
+    }
+    const dec = new TextDecoder()
+    let buf = ''
+    let full = ''
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        resetIdle()
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          const s = line.trim()
+          if (!s.startsWith('data:')) continue
+          const payload = s.slice(5).trim()
+          if (!payload || payload === '[DONE]') continue
+          try {
+            const j = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: unknown } }> }
+            const delta = j.choices?.[0]?.delta?.content
+            if (typeof delta === 'string' && delta) {
+              full += delta
+              onDelta(delta)
+            }
+          } catch {
+            /* 跳过不完整行 */
+          }
+        }
+      }
+    } catch (err) {
+      if (full) return full // 中断前已有内容：按已收到的返回
+      throw new AiError(`流式读取失败：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      clearTimeout(timer)
+      try {
+        await reader.cancel()
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!full) throw new AiError('模型返回内容为空')
+    return full
   }
 
   async listModels(): Promise<string[]> {

@@ -67,6 +67,90 @@ export class OllamaAdapter implements AiAdapter {
     }
   }
 
+  /** 流式对话：NDJSON 行解析 message.content 增量 */
+  async chatStream(req: ChatRequest, onDelta: (delta: string) => void): Promise<string> {
+    const images = (req.imageDataUrls ?? [])
+      .map((u) => u.replace(/^data:[^;]+;base64,/, ''))
+      .filter(Boolean)
+    const body: Record<string, unknown> = {
+      model: req.model,
+      messages: [
+        ...(req.system ? [{ role: 'system', content: req.system }] : []),
+        { role: 'user', content: req.prompt, ...(images.length ? { images } : {}) }
+      ],
+      stream: true,
+      ...(req.extra ?? {})
+    }
+    const controller = new AbortController()
+    let timer = setTimeout(() => controller.abort(), req.timeoutMs)
+    const resetIdle = (): void => {
+      clearTimeout(timer)
+      timer = setTimeout(() => controller.abort(), req.timeoutMs)
+    }
+    let res: Response
+    try {
+      res = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(body),
+        signal: controller.signal
+      })
+    } catch (err) {
+      clearTimeout(timer)
+      if (err instanceof AiError) throw err
+      throw new AiError(err instanceof Error && err.name === 'AbortError' ? `请求超时（${req.timeoutMs}ms）` : `网络错误：${err instanceof Error ? err.message : String(err)}`)
+    }
+    if (!res.ok) {
+      clearTimeout(timer)
+      const text = await res.text().catch(() => '')
+      throw new AiError(`HTTP ${res.status}`, res.status, text.slice(0, 600))
+    }
+    const reader = res.body?.getReader()
+    if (!reader) {
+      clearTimeout(timer)
+      throw new AiError('响应无内容流')
+    }
+    const dec = new TextDecoder()
+    let buf = ''
+    let full = ''
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        resetIdle()
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          const s = line.trim()
+          if (!s) continue
+          try {
+            const j = JSON.parse(s) as { message?: { content?: unknown }; done?: boolean }
+            const delta = j.message?.content
+            if (typeof delta === 'string' && delta) {
+              full += delta
+              onDelta(delta)
+            }
+          } catch {
+            /* 跳过不完整行 */
+          }
+        }
+      }
+    } catch (err) {
+      if (full) return full
+      throw new AiError(`流式读取失败：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      clearTimeout(timer)
+      try {
+        await reader.cancel()
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!full) throw new AiError('模型返回内容为空')
+    return full
+  }
+
   async listModels(): Promise<string[]> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 15000)

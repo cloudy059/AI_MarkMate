@@ -140,6 +140,41 @@ body,
   color: #bfbfbf;
 }
 
+/* 评分理由编辑器（弹窗内）：窗口够宽时左编辑右预览，窄时自动上下堆叠 */
+.reason-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.reason-editor .reason-edit-col {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reason-editor .reason-preview-col {
+  flex: 1 1 240px;
+  min-width: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.reason-editor .reason-preview-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.reason-editor .reason-preview-col::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
 /* ============================================================
    设置视图（集成在侧边栏内）
    ============================================================ */

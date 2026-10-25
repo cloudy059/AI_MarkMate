@@ -79,6 +79,23 @@ const api: Api = {
   onOverlayInit: (cb) => {
     overlayInitCb = cb as ((d: unknown) => void) | null
     if (overlayInitData !== null) cb(overlayInitData as never)
+  },
+
+  correctionAnalyze: (req) => ipcRenderer.invoke(IPC.CorrectionAnalyze, req),
+  correctionPolish: (text, record) => ipcRenderer.invoke(IPC.CorrectionPolish, text, record),
+  onCorrectionInit: (cb) => {
+    correctionInitCb = cb as ((d: unknown) => void) | null
+    if (correctionInitData !== null) cb(correctionInitData as never)
+  },
+  onCorrectionStream: (cb) => {
+    const handler = (_e: unknown, ev: Parameters<typeof cb>[0]) => cb(ev)
+    ipcRenderer.on(IPC.CorrectionStream, handler as never)
+    return () => {
+      ipcRenderer.removeListener(IPC.CorrectionStream, handler as never)
+    }
+  },
+  closeCorrection: () => {
+    void ipcRenderer.invoke(IPC.CorrectionClose)
   }
 }
 
@@ -88,6 +105,14 @@ let overlayInitCb: ((d: unknown) => void) | null = null
 ipcRenderer.on(IPC.OverlayInit, (_e, data) => {
   overlayInitData = data
   overlayInitCb?.(data)
+})
+
+// correction:init 消息缓存：同上，新建窗口时 init 可能在渲染层就绪前推送
+let correctionInitData: unknown = null
+let correctionInitCb: ((d: unknown) => void) | null = null
+ipcRenderer.on(IPC.CorrectionInit, (_e, data) => {
+  correctionInitData = data
+  correctionInitCb?.(data)
 })
 
 contextBridge.exposeInMainWorld('api', api)
