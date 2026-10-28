@@ -68,8 +68,6 @@ class GradingEngine {
   private lastHash: string | undefined
   /** 连续「页面未翻页」暂停次数：达到 3 次自动暂停批改，等待人工处理 */
   private notAdvancedStreak = 0
-  /** 连续空白卷计数：不同空白卷画面几乎一致，无法用哈希判断翻页，超过上限暂停以防页面卡滞 */
-  private consecutiveBlanks = 0
   private scoreSum = 0
   private scoreCount = 0
   private scoreMin = Number.POSITIVE_INFINITY
@@ -323,7 +321,6 @@ class GradingEngine {
     this.seq = 0
     this.lastHash = undefined
     this.notAdvancedStreak = 0
-    this.consecutiveBlanks = 0
     this.lastRecord = null
     this.sessionRecords = []
     this.stats = freshStats()
@@ -377,19 +374,6 @@ class GradingEngine {
     let hash = dHash(img)
     // 空白卷检测：不同空白卷画面几乎一致，哈希无法区分是否翻页，直接视为新题评分
     let blank = inkRatio(img) < BLANK_INK_RATIO
-    this.consecutiveBlanks = blank ? this.consecutiveBlanks + 1 : 0
-    if (blank && this.consecutiveBlanks > 30) {
-      this.setState(
-        'paused_notAdvanced',
-        `已连续 ${this.consecutiveBlanks} 份空白卷，为防页面卡滞已自动暂停：请确认翻页正常后点「继续」`
-      )
-      logger.warn({ phase: 'session', detail: `连续 ${this.consecutiveBlanks} 份空白卷，自动暂停批改` })
-      const r = await this.waitUser('resume')
-      this.waiter = null
-      this.waitKind = null
-      if (r === 'stop') throw new LoopAbort()
-      this.consecutiveBlanks = 0
-    }
     let advancedNaturally = true
     if (!blank && isSameQuestion(hash, this.lastHash)) {
       advancedNaturally = false
@@ -484,6 +468,7 @@ class GradingEngine {
         graderRef: ref,
         answerImage: configStore.get().workflow.mode === 'A' ? img : undefined,
         ocrText,
+        blankSuspected: blank,
         seq
       })
     /** 从评分结果提取按 box 对齐的分数（解析失败返回 null） */
@@ -507,7 +492,10 @@ class GradingEngine {
       await sleep(configStore.get().workflow.nextDelayMs)
     }
 
-    this.setState('scoring', `正在评分第 ${seq} 题${subQs.length ? `（${subQs.length} 个小题）` : ''}…`)
+    this.setState(
+      'scoring',
+      `正在评分第 ${seq} 题${subQs.length ? `（${subQs.length} 个小题）` : ''}${blank ? '（疑似空白卷）' : ''}…`
+    )
     let a = await this.withRetry(myToken, seq, 'score', () => grade(configStore.get().workflow.roles.grader))
     let parseTries = 0
     while (!scoresOf(a) && parseTries < 2) {

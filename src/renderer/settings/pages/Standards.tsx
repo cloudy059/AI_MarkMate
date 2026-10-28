@@ -136,10 +136,12 @@ export default function StandardsPage() {
       // 原图保存到本地并嵌入 Markdown（保留几何图形等无法转录的内容）
       const rel = unwrap<string>(await window.api.saveStandardImage(dataUrl))
       let md = ''
+      let ocrError = ''
       try {
         md = unwrap<string>(await window.api.imageToMarkdown(dataUrl))
-      } catch {
-        /* 纯图形等无法转录时仅嵌入原图 */
+      } catch (err) {
+        // 识别调用失败（模型未配置/不可达/不支持图片）：保留原图嵌入，但必须把原因告知用户，不能伪装成"未识别到文字"
+        ocrError = err instanceof Error ? err.message : String(err)
       }
       const parts: string[] = []
       if (md.trim()) parts.push(md.trim())
@@ -155,9 +157,13 @@ export default function StandardsPage() {
       update({ [field]: `${prefix}${lead}${parts.join('\n\n')}${tail}${suffix}` } as Partial<ScoringStandard>)
       void message.open({
         key: 'stdPaste',
-        type: 'success',
-        content: md.trim() ? '截图已识别为 Markdown 并嵌入原图' : '截图已嵌入（未识别到文字，图形已保留）',
-        duration: 2
+        type: md.trim() ? 'success' : ocrError ? 'warning' : 'success',
+        content: md.trim()
+          ? '截图已识别为 Markdown 并嵌入原图'
+          : ocrError
+            ? `截图已嵌入原图；文字识别失败：${ocrError}`
+            : '截图已嵌入（未识别到文字，图形已保留）',
+        duration: ocrError ? 6 : 2
       })
     } catch (err) {
       void message.open({

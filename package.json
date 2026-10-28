@@ -1,7 +1,7 @@
 {
   "name": "ai-grading-assistant",
   "productName": "AI自动阅卷助手",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "AI自动阅卷桌面侧边栏助手 —— 悬浮侧边栏形式的智能阅卷打分工具",
   "main": "out/main/index.js",
   "author": "AI Grading Assistant",

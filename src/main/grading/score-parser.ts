@@ -95,10 +95,10 @@ function normalizeScore(v: number, cfg: ScoreConfig): number {
   return Number(snapped.toFixed(decimals))
 }
 
-/** 对外：按主/小题配置归一化人工给分 */
+/** 对外：按主/小题配置归一化人工给分（小题步长统一跟随全局步长，防止小题自动均分产生的 0.5 步长与教师设定冲突） */
 export function normalizeScoreForConfig(v: number, cfg: ScoreConfig, subQ: SubQuestion | null): number {
   const effective: ScoreConfig = subQ
-    ? { total: subQ.maxScore, min: subQ.minScore, max: subQ.maxScore, step: subQ.step }
+    ? { total: subQ.maxScore, min: subQ.minScore, max: subQ.maxScore, step: cfg.step }
     : cfg
   return normalizeScore(v, effective)
 }
@@ -116,7 +116,7 @@ export function clampScoreForConfig(v: number, cfg: ScoreConfig, subQ: SubQuesti
  */
 export function parseScore(raw: string, cfg: ScoreConfig, subQ: SubQuestion | null): ParseResult {
   const effective: ScoreConfig = subQ
-    ? { total: subQ.maxScore, min: subQ.minScore, max: subQ.maxScore, step: subQ.step }
+    ? { total: subQ.maxScore, min: subQ.minScore, max: subQ.maxScore, step: cfg.step }
     : cfg
   const text = raw.trim()
 
@@ -198,9 +198,10 @@ function pickSubReason(v: unknown): string | undefined {
 
 /**
  * 分小题模式解析：期望 {"scores":[{"name":"小题1","score":4}, ...]} 或 {"scores":[4,3,2]}。
- * 先按小题名称对位，缺失的按顺序补齐；每个分数按各自小题配置归一化。
+ * 先按小题名称对位，缺失的按顺序补齐；每个分数按各自小题的满分范围 + 全局步长归一化。
+ * mainStep：全局评分步长（scoreConfig.step），小题步长已统一跟随全局步长
  */
-export function parseSubScores(raw: string, subQs: SubQuestion[]): ParseResult {
+export function parseSubScores(raw: string, subQs: SubQuestion[], mainStep: number): ParseResult {
   const text = raw.trim()
   const objs = extractJsonObjects(text)
   for (let i = objs.length - 1; i >= 0; i--) {
@@ -226,7 +227,7 @@ export function parseSubScores(raw: string, subQs: SubQuestion[]): ParseResult {
     })
     if (scores.some((v) => v === undefined)) continue
     const normalized = scores.map((v, idx) =>
-      normalizeScoreForConfig(v as number, { total: subQs[idx].maxScore, min: 0, max: subQs[idx].maxScore, step: 1 }, subQs[idx])
+      normalizeScoreForConfig(v as number, { total: subQs[idx].maxScore, min: 0, max: subQs[idx].maxScore, step: mainStep }, subQs[idx])
     )
     const subReasons = subQs.map((sq, idx) => reasonByName.get(sq.name) ?? orderedReasons[idx])
     return {

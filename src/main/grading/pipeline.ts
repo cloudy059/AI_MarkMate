@@ -105,9 +105,11 @@ export async function runGrade(opts: {
   answerImage?: NativeImage
   /** 模式 B/C：OCR 转录文本 */
   ocrText?: string
+  /** 截屏墨迹占比极低、系统疑似空白卷：user prompt 追加空白判定提示 */
+  blankSuspected?: boolean
   seq: number
 }): Promise<GradeOutcome> {
-  const { cfg, subQs, graderRef, answerImage, ocrText, seq } = opts
+  const { cfg, subQs, graderRef, answerImage, ocrText, blankSuspected, seq } = opts
   const purpose: 'vision' | 'chat' = answerImage ? 'vision' : 'chat'
   const target = resolveProviderRef(graderRef, purpose)
   const think = buildThinkingParams(target.providerKind ?? 'custom')
@@ -125,7 +127,7 @@ export async function runGrade(opts: {
     sampleImageCount: sampleImages.length,
     thinkByPrompt: think.note.includes('提示词')
   })
-  const user = buildGradingUserPrompt(ocrText, Boolean(answerImage))
+  const user = buildGradingUserPrompt(ocrText, Boolean(answerImage), blankSuspected)
   const imageDataUrls = answerImage
     ? [answerImage.toDataURL(), ...sampleImages]
     : sampleImages.length
@@ -142,7 +144,7 @@ export async function runGrade(opts: {
     jsonMode: true
   })
   const parse = subQs?.length
-    ? parseSubScores(res.text, subQs)
+    ? parseSubScores(res.text, subQs, cfg.scoreConfig.step)
     : parseScore(res.text, cfg.scoreConfig, null)
   logger.info({
     phase: 'score',

@@ -324,6 +324,9 @@ export function registerIpc(): void {
         throw new Error('无效的图片数据')
       }
       const cfg = configStore.get()
+      // 剪贴板截图可能为 BMP 等部分模型不接受的格式：统一规范化为 PNG 后再发送
+      const normImg = nativeImage.createFromDataURL(dataUrl)
+      const imageDataUrl = normImg.isEmpty() ? dataUrl : normImg.toDataURL()
       // 优先使用识别（OCR）角色；模式 A 下未配置时回退评分模型的视觉模型
       let target: ReturnType<typeof resolveProviderRef>
       try {
@@ -342,7 +345,7 @@ export function registerIpc(): void {
           '3. 表格用 Markdown 表格语法\n' +
           '4. 直接输出正文本身，不要添加任何解释、前言或代码围栏',
         prompt: '请把这张图片中的全部内容完整转写为 Markdown 文本（公式用 LaTeX），不要遗漏任何文字。',
-        imageDataUrls: [dataUrl],
+        imageDataUrls: [imageDataUrl],
         timeoutMs: target.timeoutMs,
         extra: think.extra
       })
@@ -351,8 +354,16 @@ export function registerIpc(): void {
         provider: target.name,
         model,
         latencyMs: res.latencyMs,
-        detail: `截图转 Markdown：${res.text.length} 字`
+        detail: `截图转 Markdown：${res.text.length} 字${res.text.trim() ? '' : '（模型返回空文本，请检查识别模型是否支持图片输入）'}`
       })
+      if (!res.text.trim()) {
+        logger.warn({
+          phase: 'docOcr',
+          provider: target.name,
+          model,
+          detail: '截图识别返回空文本：识别模型可能不具备视觉能力或未正确接收图片'
+        })
+      }
       return res.text
     })
   )

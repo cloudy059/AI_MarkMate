@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Descriptions,
+  InputNumber,
   Modal,
   Space,
   Spin,
@@ -126,13 +127,13 @@ export default function RegionsPage() {
         step: 1,
         rulesPrompt: ''
       })
-      // 重新平均：每题满分 = 总分值 ÷ 题数（0.5 步进取整）
+      // 重新平均：每题满分 = 总分值 ÷ 题数（0.5 步进取整）；步长统一跟随全局评分步长
       const n = subs.filter((s) => s.enabled).length
       const perMax =
         config.scoreConfig.total > 0
           ? Math.max(0.5, Math.round((config.scoreConfig.total / n) * 2) / 2)
           : 1.5
-      const perStep = perMax % 1 === 0 ? 1 : 0.5
+      const perStep = config.scoreConfig.step > 0 ? config.scoreConfig.step : 1
       subs = subs.map((s) => (s.enabled ? { ...s, maxScore: perMax, step: perStep } : s))
       await patch({ regions, subQuestions: subs })
       await load()
@@ -355,8 +356,41 @@ export default function RegionsPage() {
           styles={{ body: { padding: '10px 12px' } }}
         >
           <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-            首次标记为整题分值框；继续标记按顺序作为小题 1/2/3… 的分值框，满分自动均分。
+            首次标记为整题分值框；继续标记按顺序作为小题 1/2/3… 的分值框，满分自动均分，可按卷面实际分值调整。
           </Text>
+          {/* 小题满分编辑：自动均分只是初始值，各小题实际满分常不一致（如 7+8），必须可改 */}
+          {config.subQuestions.filter((s) => s.enabled).length > 0 && (
+            <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+              {config.subQuestions
+                .filter((s) => s.enabled)
+                .map((s) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 12, flex: 1 }}>{s.name}</Text>
+                    <InputNumber
+                      size="small"
+                      value={s.maxScore}
+                      min={0.5}
+                      max={999}
+                      step={0.5}
+                      precision={1}
+                      style={{ width: 110 }}
+                      addonAfter="分（满分）"
+                      onChange={(v) => {
+                        const max = Number(v)
+                        if (!Number.isFinite(max) || max <= 0) return
+                        void patch({
+                          subQuestions: config.subQuestions.map((t) =>
+                            t.id === s.id ? { ...t, maxScore: max } : t
+                          )
+                        } as never).catch((err: unknown) =>
+                          message.error(err instanceof Error ? err.message : String(err))
+                        )
+                      }}
+                    />
+                  </div>
+                ))}
+            </div>
+          )}
           <Space size={8} style={{ marginTop: 10 }}>
             <Button
               size="small"

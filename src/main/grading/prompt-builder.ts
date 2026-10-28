@@ -42,7 +42,8 @@ function formatScoreRange(cfg: ScoreConfig): string {
 export function buildGradingSystemPrompt(ctx: GradingPromptContext): string {
   const s = ctx.standard
   const subs = ctx.subQs ?? []
-  const cfg = subs.length === 1 ? { total: subs[0].maxScore, min: subs[0].minScore, max: subs[0].maxScore, step: subs[0].step } : ctx.scoreConfig
+  // 小题步长统一跟随全局评分步长（scoreConfig.step），防止小题自动均分生成的步长与教师设定冲突
+  const cfg = subs.length === 1 ? { total: subs[0].maxScore, min: subs[0].minScore, max: subs[0].maxScore, step: ctx.scoreConfig.step } : ctx.scoreConfig
   const lines: string[] = []
   lines.push(`你是一位严谨、经验丰富、打分客观一致的人民教师，正在批改学生作答。`)
   lines.push('')
@@ -55,13 +56,20 @@ export function buildGradingSystemPrompt(ctx: GradingPromptContext): string {
     lines.push(`reason 为该小题的评分依据，简明扼要。`)
     lines.push(`各小题给分要求：`)
     subs.forEach((sq, i) => {
-      lines.push(`${i + 1}. ${sq.name}：${formatScoreRange({ total: sq.maxScore, min: sq.minScore, max: sq.maxScore, step: sq.step })}`)
+      lines.push(`${i + 1}. ${sq.name}：${formatScoreRange({ total: sq.maxScore, min: sq.minScore, max: sq.maxScore, step: ctx.scoreConfig.step })}`)
     })
   } else {
     lines.push(`格式：`)
     lines.push(`{"reason": "评分依据（60字以内）", "score": <数字>}`)
     lines.push(`score 必须为数字，${formatScoreRange(cfg)}。`)
   }
+  lines.push('')
+  lines.push(`## 空白卷判定（必须严格遵守）`)
+  lines.push(
+    `- 学生未作答、作答区域空白时，整题必须给最低分 ${cfg.min} 分${subs.length ? '；某小题未作答时，该小题给其最低分' : ''}，严禁凭空给分或给满分`
+  )
+  lines.push(`- 只写题号、抄写题目、涂鸦等无效作答同样视为未作答，必须给最低分`)
+  lines.push(`- 严禁脱离图中实际作答内容给分：图中没有的内容不得得分`)
   lines.push('')
   if (ctx.thinkByPrompt) {
     lines.push(`## 思考要求`)
@@ -96,11 +104,21 @@ export function buildGradingSystemPrompt(ctx: GradingPromptContext): string {
   return lines.filter(Boolean).join('\n')
 }
 
-export function buildGradingUserPrompt(ocrText: string | undefined, hasAnswerImage: boolean): string {
+/**
+ * 组装评分 user prompt；blankSuspected：截屏墨迹占比极低、系统疑似空白卷时的追加提示
+ */
+export function buildGradingUserPrompt(
+  ocrText: string | undefined,
+  hasAnswerImage: boolean,
+  blankSuspected = false
+): string {
+  const blankNote = blankSuspected
+    ? '\n\n⚠ 系统检测到本卷作答区域墨迹占比极低，疑似空白卷：请仔细核对，若图中确无有效作答，必须给最低分，严禁凭空给分。\n'
+    : ''
   if (hasAnswerImage) {
     return ocrText
-      ? `答题卡图片见附图，其 OCR 初步转录如下（以图片为准）：\n\n${ocrText}\n\n请批改并按格式输出 JSON 分数。`
-      : '请批改附图答题卡中学生的作答，并按格式输出 JSON 分数。'
+      ? `答题卡图片见附图，其 OCR 初步转录如下（以图片为准）：\n\n${ocrText}${blankNote}\n\n请批改并按格式输出 JSON 分数。`
+      : `请批改附图答题卡中学生的作答。${blankNote}\n\n请批改并按格式输出 JSON 分数。`
   }
-  return `学生作答内容（OCR 转录）如下：\n\n${ocrText ?? '（空白）'}\n\n请批改并按格式输出 JSON 分数。`
+  return `学生作答内容（OCR 转录）如下：\n\n${ocrText ?? '（空白）'}${blankNote}\n\n请批改并按格式输出 JSON 分数。`
 }

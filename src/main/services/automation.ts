@@ -1,7 +1,6 @@
 import { clipboard, screen } from 'electron'
 import type { Region } from '@shared/types'
 import { logger } from './logger'
-import { NutAutomation } from './automation-nut'
 import { ShellAutomation } from './automation-shell'
 import type { IAutomation } from './automation-types'
 import { sleep } from './automation-types'
@@ -30,8 +29,11 @@ class AutomationService {
   }
 
   async init(): Promise<AutomationStatus> {
-    const nut = new NutAutomation()
     try {
+      // 动态加载 nut-js：arm64 Linux 无预编译二进制，require 失败必须能落入降级逻辑，
+      // 绝不能在模块加载阶段静态 import 导致主进程启动即崩
+      const { NutAutomation } = await import('./automation-nut')
+      const nut = new NutAutomation()
       if (await nut.probe()) {
         this.impl = nut
         this.status = { impl: 'nut', ok: true, message: '键鼠自动化已就绪（nut-js）' }

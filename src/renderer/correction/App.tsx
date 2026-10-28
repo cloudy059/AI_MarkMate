@@ -363,18 +363,26 @@ export default function CorrectionApp() {
                     <>
                       {subs.map((sq, i) => (
                         <div key={sq.id} className="sub-score-row" style={{ gap: 8 }}>
-                          <Text style={{ fontSize: 12, flex: 1 }}>{sq.name}</Text>
+                          <Text style={{ fontSize: 12, flex: 1 }}>
+                            {sq.name}
+                            <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                              （满分 {sq.maxScore}）
+                            </Text>
+                          </Text>
                           <InputNumber
                             size="small"
                             value={teacherScores[i]}
-                            onChange={(v) =>
+                            onChange={(v) => {
                               setTeacherScores((prev) => prev.map((s, j) => (j === i ? Number(v) : s)))
-                            }
+                              // 改小题分后总分手动覆盖失效，回到「各小题之和」自动模式
+                              setTotalTouched(false)
+                              setTotalOverride(null)
+                            }}
                             min={sq.minScore}
                             max={sq.maxScore}
-                            step={sq.step || 1}
+                            step={scoreCfg.step || 1}
                             precision={2}
-                            style={{ width: 90 }}
+                            style={{ width: 110 }}
                             addonAfter="分"
                           />
                         </div>

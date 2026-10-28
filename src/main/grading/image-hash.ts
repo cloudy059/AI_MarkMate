@@ -48,5 +48,5 @@ export function inkRatio(img: NativeImage): number {
   return ink / (buf.length / 4)
 }
 
-/** 墨迹占比低于此值视为空白卷：不同空白卷画面几乎一致，哈希无法区分是否翻页 */
-export const BLANK_INK_RATIO = 0.01
+/** 墨迹占比低于此值视为空白卷：仅几乎纯白的画面才提示（阈值过高会把作答稀疏的真实卷误报为空白） */
+export const BLANK_INK_RATIO = 0.002

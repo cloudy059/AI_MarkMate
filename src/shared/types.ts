@@ -131,6 +131,7 @@ export interface SubQuestion {
   scoreBoxId: string | null
   maxScore: number
   minScore: number
+  /** 已废弃：小题步长统一跟随全局评分步长（scoreConfig.step），此字段仅兼容旧配置保留 */
   step: number
   /** 小题独立评分规则 */
   rulesPrompt: string
