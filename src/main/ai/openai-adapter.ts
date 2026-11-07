@@ -17,8 +17,14 @@ export class OpenAiAdapter implements AiAdapter {
     return h
   }
 
-  private async fetchJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
+  private async fetchJson(url: string, init: RequestInit, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
     const controller = new AbortController()
+    // 外部中止信号（停止/暂停批改）联动内部控制器
+    const onExternalAbort = (): void => controller.abort()
+    if (signal) {
+      if (signal.aborted) controller.abort()
+      else signal.addEventListener('abort', onExternalAbort, { once: true })
+    }
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     let res: Response
     let bodyText = ''
@@ -26,10 +32,14 @@ export class OpenAiAdapter implements AiAdapter {
       res = await fetch(url, { ...init, signal: controller.signal })
       bodyText = await res.text()
     } catch (err) {
-      const msg = err instanceof Error && err.name === 'AbortError' ? `请求超时（${timeoutMs}ms）` : `网络错误：${err instanceof Error ? err.message : String(err)}`
+      const aborted = signal?.aborted === true
+      const msg = err instanceof Error && err.name === 'AbortError'
+        ? (aborted ? '请求已中止' : `请求超时（${timeoutMs}ms）`)
+        : `网络错误：${err instanceof Error ? err.message : String(err)}`
       throw new AiError(msg)
     } finally {
       clearTimeout(timer)
+      signal?.removeEventListener('abort', onExternalAbort)
     }
     if (!res.ok) throw new AiError(`HTTP ${res.status}`, res.status, bodyText.slice(0, 600))
     try {
@@ -56,8 +66,10 @@ export class OpenAiAdapter implements AiAdapter {
         method: 'POST',
         headers: this.headers(),
         body: JSON.stringify(body)
-      }, req.timeoutMs)
+      }, req.timeoutMs, req.signal)
     } catch (err) {
+      // 用户主动中止的请求不再降级重试
+      if (req.signal?.aborted) throw err
       // 部分中转/模型不支持 response_format，自动降级重试一次
       if (req.jsonMode && err instanceof AiError && err.body && /response_format|json_object/i.test(err.body)) {
         delete body.response_format
@@ -65,7 +77,7 @@ export class OpenAiAdapter implements AiAdapter {
           method: 'POST',
           headers: this.headers(),
           body: JSON.stringify(body)
-        }, req.timeoutMs)
+        }, req.timeoutMs, req.signal)
       } else throw err
     }
     const choice = data?.choices?.[0]

@@ -70,7 +70,7 @@ export function loadSampleImages(standard: ScoringStandard | null): string[] {
 }
 
 /** 模式 B/C 第一步：识图提取作答文本（LaTeX） */
-export async function runOcr(img: NativeImage, cfg: AppConfig, seq: number): Promise<OcrOutcome> {
+export async function runOcr(img: NativeImage, cfg: AppConfig, seq: number, signal?: AbortSignal): Promise<OcrOutcome> {
   const target = resolveProviderRef(cfg.workflow.roles.ocr, 'ocr')
   const think = buildThinkingParams(target.providerKind ?? 'custom')
   const model = think.modelOverride ?? target.model
@@ -81,7 +81,8 @@ export async function runOcr(img: NativeImage, cfg: AppConfig, seq: number): Pro
     prompt: OCR_USER_PROMPT,
     imageDataUrls: [img.toDataURL()],
     timeoutMs: target.timeoutMs,
-    extra: think.extra
+    extra: think.extra,
+    signal
   })
   logger.info({
     phase: 'ocr',
@@ -107,9 +108,11 @@ export async function runGrade(opts: {
   ocrText?: string
   /** 截屏墨迹占比极低、系统疑似空白卷：user prompt 追加空白判定提示 */
   blankSuspected?: boolean
+  /** 停止/暂停批改时立即中止在途请求 */
+  signal?: AbortSignal
   seq: number
 }): Promise<GradeOutcome> {
-  const { cfg, subQs, graderRef, answerImage, ocrText, blankSuspected, seq } = opts
+  const { cfg, subQs, graderRef, answerImage, ocrText, blankSuspected, signal, seq } = opts
   const purpose: 'vision' | 'chat' = answerImage ? 'vision' : 'chat'
   const target = resolveProviderRef(graderRef, purpose)
   const think = buildThinkingParams(target.providerKind ?? 'custom')
@@ -141,7 +144,8 @@ export async function runGrade(opts: {
     imageDataUrls,
     timeoutMs: target.timeoutMs,
     extra: think.extra,
-    jsonMode: true
+    jsonMode: true,
+    signal
   })
   const parse = subQs?.length
     ? parseSubScores(res.text, subQs, cfg.scoreConfig.step)

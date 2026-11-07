@@ -13,6 +13,8 @@ export interface ChatRequest {
   extra?: Record<string, unknown>
   /** 要求 JSON 输出（OpenAI response_format / Ollama format） */
   jsonMode?: boolean
+  /** 外部中止信号：停止/暂停批改时立即中断在途请求 */
+  signal?: AbortSignal
 }
 
 export interface ChatResponse {

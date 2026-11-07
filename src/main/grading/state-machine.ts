@@ -74,6 +74,8 @@ class GradingEngine {
   private scoreMax = Number.NEGATIVE_INFINITY
   private waiter: ((v: unknown) => void) | null = null
   private waitKind: string | null = null
+  /** 当前在途 AI 请求的中止控制器：点停止/暂停时立即中断 */
+  private abortCtrl: AbortController | null = null
   private emit: (e: GradingEvent) => void = () => undefined
 
   setEmitter(fn: (e: GradingEvent) => void): void {
@@ -105,11 +107,15 @@ class GradingEngine {
         this.token += 1
         this.paused = false
         this.resolveWaiter('stop')
+        // 立即中止在途 AI 请求，无需等当前这份改完
+        this.abortCtrl?.abort()
         this.setState('idle')
         this.emitStats()
         return { ok: true }
       case 'pause':
         this.paused = true
+        // 立即中止在途 AI 请求：暂停即刻生效
+        this.abortCtrl?.abort()
         this.resolveWaiter('paused')
         return { ok: true }
       case 'resume':
@@ -193,6 +199,40 @@ class GradingEngine {
     })
   }
 
+  /** 等待用户操作：期间收到「暂停」先等恢复，恢复后重新等待原操作（确认/仲裁/给分不因暂停而丢失或误放行） */
+  private async waitUserPausable(kind: string): Promise<unknown> {
+    for (;;) {
+      const r = await this.waitUser(kind)
+      if (r !== 'paused') return r
+      this.setState('paused_manual', '已暂停，等待恢复')
+      const r2 = await this.waitUser('resume')
+      if (r2 === 'stop') return 'stop'
+    }
+  }
+
+  /** 可被「停止/暂停」立即打断的等待：停止→中止批改；暂停→等恢复后立即继续（不补等剩余时间） */
+  private async sleepInterruptible(ms: number): Promise<void> {
+    const until = Date.now() + ms
+    for (;;) {
+      const remain = until - Date.now()
+      if (remain <= 0) return
+      const r = await Promise.race([sleep(remain).then(() => 'tick'), this.waitUser('interrupt')])
+      if (r === 'tick') {
+        this.waiter = null
+        this.waitKind = null
+        continue
+      }
+      if (r === 'stop') throw new LoopAbort()
+      if (r === 'paused') {
+        this.setState('paused_manual', '已暂停，等待恢复')
+        const r2 = await this.waitUser('resume')
+        if (r2 === 'stop') throw new LoopAbort()
+        return
+      }
+      // 其他控制信号在本阶段无意义：忽略，继续等待剩余时间
+    }
+  }
+
   private setState(s: GradingState, message?: string): void {
     this.state = s
     this.emit({ type: 'state', state: s, message })
@@ -214,20 +254,35 @@ class GradingEngine {
   private async checkPause(): Promise<void> {
     if (!this.paused) return
     this.setState('paused_manual', '已暂停，等待恢复')
-    const r = await this.waitUser('resume')
+    const r = await this.waitUserPausable('resume')
     if (r === 'stop') throw new LoopAbort()
   }
 
-  /** AI/截屏调用统一重试：指数退避 3 次 → 暂停等用户处理 */
-  private async withRetry<T>(myToken: number, seq: number, phase: string, fn: () => Promise<T>): Promise<T> {
+  /** AI/截屏调用统一重试：指数退避 3 次 → 暂停等用户处理；点停止/暂停可立即中止在途请求 */
+  private async withRetry<T>(myToken: number, seq: number, phase: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       this.assertToken(myToken)
+      // 暂停中（含在途请求被暂停中止后回到这里）：先等待恢复，再重新执行本阶段
+      if (this.paused) {
+        this.setState('paused_manual', '已暂停，等待恢复')
+        const r = await this.waitUser('resume')
+        if (r === 'stop') throw new LoopAbort()
+        attempt = -1
+        continue
+      }
+      const ctrl = new AbortController()
+      this.abortCtrl = ctrl
       try {
-        return await fn()
+        return await fn(ctrl.signal)
       } catch (err) {
         this.assertToken(myToken)
-        const msg = err instanceof Error ? err.message : String(err)
         if (err instanceof LoopAbort) throw err
+        // 请求因点「暂停」被中止：不计失败，回循环顶部等待恢复后重试
+        if (ctrl.signal.aborted && this.paused) {
+          attempt = -1
+          continue
+        }
+        const msg = err instanceof Error ? err.message : String(err)
         if (attempt >= 2) {
           logger.error({ phase, seq, error: msg })
           this.emit({ type: 'error', message: `${phase} 失败：${msg}`, recoverable: true })
@@ -238,7 +293,9 @@ class GradingEngine {
           continue
         }
         logger.warn({ phase, seq, detail: `第 ${attempt + 1} 次失败，即将重试：${msg}` })
-        await sleep(2500 * (attempt + 1))
+        await this.sleepInterruptible(2500 * (attempt + 1))
+      } finally {
+        if (this.abortCtrl === ctrl) this.abortCtrl = null
       }
     }
   }
@@ -385,9 +442,7 @@ class GradingEngine {
           '页面连续 3 次未翻页，已自动暂停批改：请检查阅卷页面是否能正常翻页，处理后点「继续」'
         )
         logger.warn({ phase: 'session', detail: '页面连续 3 次未翻页，自动暂停批改' })
-        const r = await this.waitUser('resume')
-        this.waiter = null
-        this.waitKind = null
+        const r = await this.waitUserPausable('resume')
         if (r === 'stop') throw new LoopAbort()
         this.notAdvancedStreak = 0
       } else {
@@ -413,6 +468,11 @@ class GradingEngine {
         }
         this.waiter = null
         this.waitKind = null
+        // 倒计时期间点「暂停」：先等恢复，再继续处理
+        if (r === 'paused') {
+          this.setState('paused_manual', '已暂停，等待恢复')
+          r = await this.waitUser('resume')
+        }
         if (r === 'stop') throw new LoopAbort()
       }
       // 自动/手动继续：视为重评当前页这一题，清除同题标记并取最新画面
@@ -450,7 +510,7 @@ class GradingEngine {
     let ocrText: string | undefined
     if (cfg.workflow.mode !== 'A') {
       this.setState('recognizing', `正在识别第 ${seq} 题作答内容…`)
-      const ocr = await this.withRetry(myToken, seq, 'ocr', () => runOcr(img, configStore.get(), seq))
+      const ocr = await this.withRetry(myToken, seq, 'ocr', (signal) => runOcr(img, configStore.get(), seq, signal))
       ocrText = ocr.text
       record.ocrText = ocrText
       record.usedModels.push(`识别:${ocr.provider}/${ocr.model}`)
@@ -461,7 +521,7 @@ class GradingEngine {
     const boxes = this.activeTargets(cfg)
     const subQs = boxes[0].subQ ? (boxes.map((b) => b.subQ) as SubQuestion[]) : []
     const gradingMode = cfg.workflow.gradingMode
-    const grade = (ref: typeof cfg.workflow.roles.grader): Promise<GradeOutcome> =>
+    const grade = (ref: typeof cfg.workflow.roles.grader, signal?: AbortSignal): Promise<GradeOutcome> =>
       runGrade({
         cfg: configStore.get(),
         subQs: subQs.length ? subQs : undefined,
@@ -469,6 +529,7 @@ class GradingEngine {
         answerImage: configStore.get().workflow.mode === 'A' ? img : undefined,
         ocrText,
         blankSuspected: blank,
+        signal,
         seq
       })
     /** 从评分结果提取按 box 对齐的分数（解析失败返回 null） */
@@ -489,18 +550,18 @@ class GradingEngine {
       this.emit({ type: 'record', record: { ...record } })
       this.emitStats()
       this.setState('waiting_next', '本题为跳过，等待下一题…')
-      await sleep(configStore.get().workflow.nextDelayMs)
+      await this.sleepInterruptible(configStore.get().workflow.nextDelayMs)
     }
 
     this.setState(
       'scoring',
       `正在评分第 ${seq} 题${subQs.length ? `（${subQs.length} 个小题）` : ''}${blank ? '（疑似空白卷）' : ''}…`
     )
-    let a = await this.withRetry(myToken, seq, 'score', () => grade(configStore.get().workflow.roles.grader))
+    let a = await this.withRetry(myToken, seq, 'score', (signal) => grade(configStore.get().workflow.roles.grader, signal))
     let parseTries = 0
     while (!scoresOf(a) && parseTries < 2) {
       parseTries++
-      a = await this.withRetry(myToken, seq, 'score', () => grade(configStore.get().workflow.roles.grader))
+      a = await this.withRetry(myToken, seq, 'score', (signal) => grade(configStore.get().workflow.roles.grader, signal))
     }
     let scoresA = scoresOf(a)
     let finals: number[] | null = null
@@ -521,11 +582,11 @@ class GradingEngine {
       if (gradingMode === 'double') {
         this.setState('scoring2', `第二模型独立评分中…`)
         const grader2Ref = configStore.get().workflow.roles.grader2 ?? configStore.get().workflow.roles.grader
-        let b = await this.withRetry(myToken, seq, 'score2', () => grade(grader2Ref))
+        let b = await this.withRetry(myToken, seq, 'score2', (signal) => grade(grader2Ref, signal))
         let parseTriesB = 0
         while (!scoresOf(b) && parseTriesB < 2) {
           parseTriesB++
-          b = await this.withRetry(myToken, seq, 'score2', () => grade(grader2Ref))
+          b = await this.withRetry(myToken, seq, 'score2', (signal) => grade(grader2Ref, signal))
         }
         scoresB = scoresOf(b)
         if (!scoresB) {
@@ -550,7 +611,7 @@ class GradingEngine {
               record.scoreB = scoresB[i]
               record.arbited = true
               this.emit({ type: 'arbitrate', record: { ...record }, threshold })
-              const r = await this.waitUser('arbitrate')
+              const r = await this.waitUserPausable('arbitrate')
               if (r === 'stop') throw new LoopAbort()
               if (r === 'reject' || r === 'skip') return skipQuestion()
               f = clampScoreForConfig((r as { score: number }).score, configStore.get().scoreConfig, boxes[i].subQ)
@@ -596,7 +657,7 @@ class GradingEngine {
     if (gradingMode === 'trial') this.openCorrection()
     let submitDecision: 'submit' | 'skip' = 'submit'
     if (gradingMode === 'trial') {
-      const r = await this.waitUser('confirm')
+      const r = await this.waitUserPausable('confirm')
       if (r === 'stop') throw new LoopAbort()
       if (r === 'reject' || r === 'skip') submitDecision = 'skip'
       else if (r && typeof r === 'object' && 'correction' in r) {
@@ -688,7 +749,7 @@ class GradingEngine {
 
     // ---- 6) 等待翻页 ----
     this.setState('waiting_next', `等待下一题（${Math.round(configStore.get().workflow.nextDelayMs / 1000)} 秒）…`)
-    await sleep(configStore.get().workflow.nextDelayMs)
+    await this.sleepInterruptible(configStore.get().workflow.nextDelayMs)
   }
 
   /** 应用纠错结果：教师修正分覆盖 AI 分、理由记入历史、按需更新评分标准 */
@@ -764,7 +825,7 @@ class GradingEngine {
         : tip,
       recoverable: true
     })
-    const r = await this.waitUser('manualScore')
+    const r = await this.waitUserPausable('manualScore')
     if (r === 'stop') throw new LoopAbort()
     if (r === 'reject' || r === 'skip') return 'skip'
     const arr = (r as { score: number[] }).score

@@ -37,6 +37,12 @@ export class OllamaAdapter implements AiAdapter {
       }
     }
     const controller = new AbortController()
+    // 外部中止信号（停止/暂停批改）联动内部控制器
+    const onExternalAbort = (): void => controller.abort()
+    if (req.signal) {
+      if (req.signal.aborted) controller.abort()
+      else req.signal.addEventListener('abort', onExternalAbort, { once: true })
+    }
     const timer = setTimeout(() => controller.abort(), req.timeoutMs)
     let data: any
     try {
@@ -51,10 +57,14 @@ export class OllamaAdapter implements AiAdapter {
       data = JSON.parse(text)
     } catch (err) {
       if (err instanceof AiError) throw err
-      const msg = err instanceof Error && err.name === 'AbortError' ? `请求超时（${req.timeoutMs}ms）` : `网络错误：${err instanceof Error ? err.message : String(err)}`
+      const aborted = req.signal?.aborted === true
+      const msg = err instanceof Error && err.name === 'AbortError'
+        ? (aborted ? '请求已中止' : `请求超时（${req.timeoutMs}ms）`)
+        : `网络错误：${err instanceof Error ? err.message : String(err)}`
       throw new AiError(msg)
     } finally {
       clearTimeout(timer)
+      req.signal?.removeEventListener('abort', onExternalAbort)
     }
     const content: string = data?.message?.content ?? ''
     if (!content) throw new AiError('模型返回内容为空', undefined, JSON.stringify(data).slice(0, 600))
