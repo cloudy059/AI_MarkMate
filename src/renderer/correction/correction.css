@@ -118,16 +118,86 @@ body,
   border-radius: 3px;
 }
 
-.sub-score-list {
+.sub-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 小题得分 / 给分：自适应多列网格，小题多时不再逐行铺开 */
+.sub-score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));
+  gap: 4px;
+}
+
+.sub-score-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid rgba(22, 119, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(22, 119, 255, 0.05);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.sub-score-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #595959;
+}
+
+.sub-score-value {
+  flex: none;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #1677ff;
+}
+
+.sub-score-arbit {
+  flex: none;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #fff7e6;
+  color: #d46b08;
+  font-size: 10px;
+  line-height: 14px;
+  cursor: help;
+}
+
+.sub-input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 6px 8px;
+}
+
+.sub-input-cell {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.sub-score-row {
+.sub-input-label {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub-total-row {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(15, 23, 42, 0.12);
 }
 
 /* 评分理由编辑器：左编辑右预览（窄窗口自动上下堆叠） */

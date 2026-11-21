@@ -65,7 +65,7 @@ const api: Api = {
   loadStandardImage: (relPath) => ipcRenderer.invoke(IPC.StandardImageLoad, relPath),
   saveStandardImage: (dataUrl) => ipcRenderer.invoke(IPC.StandardImageSave, dataUrl),
 
-  generateRubric: (req) => ipcRenderer.invoke(IPC.AiGenerateRubric, req),
+  generateStandard: (req) => ipcRenderer.invoke(IPC.AiGenerateStandard, req),
   readClipboardImage: () => ipcRenderer.invoke(IPC.ClipboardReadImage),
   imageToMarkdown: (dataUrl) => ipcRenderer.invoke(IPC.AiImageToMarkdown, dataUrl),
 
@@ -98,6 +98,32 @@ const api: Api = {
   },
   closeCorrection: () => {
     void ipcRenderer.invoke(IPC.CorrectionClose)
+  },
+
+  openRichText: (payload) => ipcRenderer.invoke(IPC.RichTextOpen, payload),
+  onRichTextInit: (cb) => {
+    richTextInitCb = cb as ((d: unknown) => void) | null
+    if (richTextInitData !== null) cb(richTextInitData as never)
+  },
+  submitRichText: (markdown) => {
+    void ipcRenderer.invoke(IPC.RichTextSubmit, markdown)
+  },
+  cancelRichText: () => {
+    void ipcRenderer.invoke(IPC.RichTextCancel)
+  },
+  onRichTextResult: (cb) => {
+    const handler = (_e: unknown, r: Parameters<typeof cb>[0]) => cb(r)
+    ipcRenderer.on(IPC.RichTextResult, handler as never)
+    return () => {
+      ipcRenderer.removeListener(IPC.RichTextResult, handler as never)
+    }
+  },
+  onRichTextPaste: (cb) => {
+    const handler = (_e: unknown, p: Parameters<typeof cb>[0]) => cb(p)
+    ipcRenderer.on(IPC.RichTextPaste, handler as never)
+    return () => {
+      ipcRenderer.removeListener(IPC.RichTextPaste, handler as never)
+    }
   }
 }
 
@@ -115,6 +141,14 @@ let correctionInitCb: ((d: unknown) => void) | null = null
 ipcRenderer.on(IPC.CorrectionInit, (_e, data) => {
   correctionInitData = data
   correctionInitCb?.(data)
+})
+
+// richtext:init 消息缓存：新建编辑窗口时 init 可能在渲染层就绪前推送
+let richTextInitData: unknown = null
+let richTextInitCb: ((d: unknown) => void) | null = null
+ipcRenderer.on(IPC.RichTextInit, (_e, data) => {
+  richTextInitData = data
+  richTextInitCb?.(data)
 })
 
 contextBridge.exposeInMainWorld('api', api)

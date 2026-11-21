@@ -5,6 +5,7 @@ node_modules/
 out/
 dist/
 release/
+release-*/
 *.exe
 *.exe.blockmap
 *.dmg
@@ -22,6 +23,9 @@ captures/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# WorkBuddy 本地工作数据（记忆/日志，不纳入代码仓库）
+.workbuddy/
 
 # 环境变量（防止密钥泄露）
 .env

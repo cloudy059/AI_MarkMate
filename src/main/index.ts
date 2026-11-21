@@ -10,7 +10,6 @@ import { gradingEngine } from '@main/grading/state-machine'
 import {
   broadcastGradingEvent,
   createSidebar,
-  openSettings,
   toggleSidebar
 } from '@main/windows'
 import { registerIpc } from '@main/ipc'
@@ -58,7 +57,6 @@ function rebuildTrayMenu(): void {
     { label: running ? '停止批改' : '开始批改', click: () => gradingEngine.control(running ? 'stop' : 'start') },
     { type: 'separator' },
     { label: '显示 / 隐藏侧边栏', click: () => toggleSidebar() },
-    { label: '打开设置', click: () => openSettings() },
     { type: 'separator' },
     { label: '退出', click: () => {
       configStore.saveNow()
@@ -127,18 +125,13 @@ app.whenReady().then(() => {
     }
   }
 
-  // 首次使用引导
-  if (!configStore.get().onboardingDone) openSettings('onboarding')
-
   app.on('activate', () => {
     createSidebar()
   })
 })
 
 app.on('second-instance', () => {
-  const cfg = configStore.get()
-  if (cfg.settings.sidebarHidden) toggleSidebar('show')
-  else openSettings()
+  toggleSidebar('show')
 })
 
 app.on('before-quit', () => {

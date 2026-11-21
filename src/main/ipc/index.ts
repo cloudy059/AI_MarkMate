@@ -6,10 +6,11 @@ import {
   type AdjustBox,
   type AppConfig,
   type CorrectionAnalyzeRequest,
-  type GenerateRubricRequest,
+  type GenerateStandardRequest,
   type LanNode,
   type LogEntry,
-  type RegionKind
+  type RegionKind,
+  type RichTextInitPayload
 } from '@shared/types'
 import { configStore } from '@main/services/config-store'
 import { logger } from '@main/services/logger'
@@ -31,13 +32,24 @@ import {
   adjustRegionBoxes,
   markRegion,
   openSettings,
-  toggleSidebar
+  toggleSidebar,
+  openRichTextEditor,
+  submitRichText,
+  cancelRichText
 } from '@main/windows'
 import { genId } from '@main/utils'
 import { applyHotkey } from '@main/hotkey'
 
 function register(key: string, handler: (e: IpcMainInvokeEvent, ...args: any[]) => any): void {
   ipcMain.handle(key, handler as any)
+}
+
+/** 富文本字段送模型前规整：嵌入图替换为占位、剥离可能残留的 HTML 标签（Markdown/LaTeX 原样保留） */
+function stripRichText(text: string): string {
+  return text
+    .replace(/!\[[^\]]*\]\((?:stdimg:\/\/|data:)[^)]+\)/g, '[图]')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g, '')
+    .trim()
 }
 
 /** 统一错误包装：把异常消息返回给渲染进程 */
@@ -54,6 +66,18 @@ function safe<A extends any[], R>(fn: (...args: A) => Promise<R> | R): (...args:
 }
 
 export function registerIpc(): void {
+  // ---------------- 独立富文本编辑窗口 ----------------
+  register(IPC.RichTextOpen, (e, payload: RichTextInitPayload) => {
+    openRichTextEditor(e.sender, payload)
+    return true
+  })
+  register(IPC.RichTextSubmit, (_e, markdown: string) => {
+    submitRichText(markdown)
+  })
+  register(IPC.RichTextCancel, () => {
+    cancelRichText()
+  })
+
   // ---------------- 配置 ----------------
   register(IPC.ConfigGet, () => configStore.get())
   register(IPC.ConfigPatch, (_e, partial: Record<string, unknown>) => {
@@ -209,7 +233,7 @@ export function registerIpc(): void {
     IPC.StandardImageAdd,
     safe(async (_e, standardId: string) => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
-        title: '选择评分参考图片',
+        title: '选择要插入题目 / 答案 / 评分标准的图片',
         filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'webp'] }],
         properties: ['openFile', 'multiSelections']
       })
@@ -252,42 +276,44 @@ export function registerIpc(): void {
     })
   )
 
-  // ---------------- AI 生成评分细则 ----------------
+  // ---------------- AI 生成评分标准（依据已输入的题目题干 + 参考答案） ----------------
   register(
-    IPC.AiGenerateRubric,
-    safe(async (_e, req: GenerateRubricRequest) => {
+    IPC.AiGenerateStandard,
+    safe(async (_e, req: GenerateStandardRequest) => {
+      const stem = req.questionStem?.trim() ?? ''
+      const answer = req.referenceAnswer?.trim() ?? ''
+      if (!stem && !answer) {
+        throw new Error('请先在「题目题干」或「参考答案」中填写内容，再生成评分标准')
+      }
       const cfg = configStore.get()
       const target = resolveProviderRef(cfg.workflow.roles.grader, 'chat')
       const think = buildThinkingParams(target.providerKind ?? 'custom')
       const model = think.modelOverride ?? target.model
       const lines = [
-        '你是一位资深教研专家，擅长制定严谨、可操作的评分细则。',
+        '你是一位资深教研专家，擅长依据题目与参考答案制定严谨、可操作的评分标准。',
         '',
-        '请根据以下信息起草一份评分细则（评分标准），要求：',
-        '1. 使用 Markdown 格式',
-        '2. 先给出总体评分原则，再按得分点/分档列出细则（明确每个档次的分数区间与判定条件）',
-        '3. 列出常见扣分点与宽容处理建议（如错别字、格式、单位等）',
-        '4. 数学公式用 LaTeX 表示',
-        '5. 内容具体、可执行，AI 批卷时可直接对照执行',
+        '请根据下面已给出的【题目题干】与【参考答案】起草一份评分标准，要求：',
+        '1. 使用 Markdown 格式，直接输出评分标准正文，不要额外说明、不要复述题目与答案',
+        '2. 严格依据题干的设问与参考答案的解题步骤/要点拆分得分点，每个得分点写明分值、判定条件与可给/不给的边界',
+        '3. 按「总体评分原则 → 分档或分步得分点 → 常见扣分点与宽容处理」组织；各得分点分值之和必须等于满分',
+        '4. 不得引入题干与参考答案之外的知识点或额外答案；答案中的等价表述、不同解法要说明如何给分',
+        '5. 数学公式用 LaTeX 表示（行内 $...$、独立 $$...$$），内容具体、可执行，AI 批卷时可直接对照执行',
         '',
-        `【年段】${req.grade}`,
-        `【学科】${req.subject}`,
-        `【题型】${req.questionType}`,
         `【满分】${req.totalScore} 分`,
-        req.questionStem.trim() ? `【题目题干】\n${req.questionStem}` : '',
-        req.referenceAnswer.trim() ? `【参考答案】\n${req.referenceAnswer}` : '',
-        req.extraRequirement?.trim() ? `【其他要求】\n${req.extraRequirement}` : '',
+        stem ? `【题目题干】\n${stripRichText(stem)}` : '【题目题干】（未提供，请依据参考答案合理推断）',
+        answer ? `【参考答案】\n${stripRichText(answer)}` : '【参考答案】（未提供，请依据题目题干合理拟定要点）',
+        req.extraRequirement?.trim() ? `【补充要求】\n${req.extraRequirement.trim()}` : '',
         '',
-        '请直接输出评分细则正文，不要额外说明。'
+        '请直接输出评分标准正文。'
       ]
       const res = await target.adapter.chat({
         model,
-        system: '你是命题与评价专家，输出为结构清晰的 Markdown 评分细则。',
+        system: '你是命题与评价专家，依据题干与参考答案输出结构清晰、分值闭合的 Markdown 评分标准。',
         prompt: lines.filter(Boolean).join('\n'),
         timeoutMs: target.timeoutMs,
         extra: think.extra
       })
-      logger.info({ phase: 'rubric', provider: target.name, model, latencyMs: res.latencyMs, detail: 'AI 生成评分细则' })
+      logger.info({ phase: 'rubric', provider: target.name, model, latencyMs: res.latencyMs, detail: 'AI 生成评分标准（题干 + 参考答案）' })
       return res.text
     })
   )

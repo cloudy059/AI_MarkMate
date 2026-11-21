@@ -7,7 +7,7 @@ import type {
   CorrectionInitPayload,
   CorrectionStreamEvent,
   DeepPartial,
-  GenerateRubricRequest,
+  GenerateStandardRequest,
   GradingEvent,
   GradingStatsPayload,
   LanNode,
@@ -17,6 +17,9 @@ import type {
   Rect,
   Region,
   RegionKind,
+  RichTextInitPayload,
+  RichTextPastePayload,
+  RichTextResultPayload,
   ScoringStandard,
   TestResult
 } from './types'
@@ -79,8 +82,9 @@ export interface Api {
   /** 保存粘贴的截图到标准图片目录，返回相对路径（用于嵌入 Markdown） */
   saveStandardImage(dataUrl: string): Promise<string>
 
-  // ----- AI 生成评分细则 -----
-  generateRubric(req: GenerateRubricRequest): Promise<string>
+  // ----- AI 生成评分标准 -----
+  /** 依据当前套已输入的题目题干与参考答案生成评分标准（Markdown） */
+  generateStandard(req: GenerateStandardRequest): Promise<string>
   /** 读取剪贴板中的图片（无图片返回 null） */
   readClipboardImage(): Promise<{ dataUrl: string } | null>
   /** AI 将截图内容转写为 Markdown（公式用 LaTeX） */
@@ -104,4 +108,18 @@ export interface Api {
   onCorrectionStream(cb: (e: CorrectionStreamEvent) => void): () => void
   /** 关闭纠错窗口 */
   closeCorrection(): void
+
+  // ----- 独立富文本编辑窗口 -----
+  /** 在屏幕中央打开独立编辑窗口（同一次只允许一个，重复打开会复用窗口） */
+  openRichText(payload: RichTextInitPayload): Promise<boolean>
+  /** 编辑器窗口：接收初始化数据（主进程推送；preload 内置缓存） */
+  onRichTextInit(cb: (data: RichTextInitPayload) => void): void
+  /** 编辑器窗口：保存并提交 Markdown */
+  submitRichText(markdown: string): void
+  /** 编辑器窗口：放弃修改并关闭 */
+  cancelRichText(): void
+  /** 发起窗口：接收编辑结果（value 为 null 表示取消） */
+  onRichTextResult(cb: (r: RichTextResultPayload) => void): () => void
+  /** 编辑器窗口：接收右键菜单的粘贴指令（文本 / 截图 AI 识别 / 截图原图） */
+  onRichTextPaste(cb: (p: RichTextPastePayload) => void): () => void
 }

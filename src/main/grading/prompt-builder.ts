@@ -15,8 +15,8 @@ export interface GradingPromptContext {
   globalRules: string
   /** 分小题模式：一次评完全部小题；空 = 整题评分 */
   subQs?: SubQuestion[]
-  /** 示例参考图片是否已随请求附图 */
-  sampleImageCount: number
+  /** 题目/答案/评分标准中嵌入的原图已随请求附图的张数 */
+  embeddedImageCount: number
   /** 深度思考以提示词注入（厂商无原生参数时） */
   thinkByPrompt: boolean
 }
@@ -26,11 +26,12 @@ function section(title: string, body: string): string {
   return b ? `## ${title}\n${b}\n` : ''
 }
 
-/** 剥离嵌入图（stdimg:// / data:）为 [图] 占位：图片随请求附图发送，避免 base64 撑爆提示词 */
+/** 剥离嵌入图（stdimg:// / data:）为 [图] 占位，并清除可能残留的 HTML 标签：图片随请求附图发送，避免 base64 / 标签撑爆提示词 */
 export function stripEmbeddedImages(text: string): string {
   return text
     .replace(/!\[[^\]]*\]\(stdimg:\/\/[^)\s]+\)/g, '[图]')
     .replace(/!\[[^\]]*\]\(data:[^)]+\)/g, '[图]')
+    .replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?\/?>/g, '')
 }
 
 function formatScoreRange(cfg: ScoreConfig): string {
@@ -92,14 +93,13 @@ export function buildGradingSystemPrompt(ctx: GradingPromptContext): string {
     }
   }
   if (s) {
+    // 顺序与编辑界面一致：题目题干 → 参考答案 → 评分标准
     if (s.questionStem.trim()) lines.push(section('题目题干', s.questionStem))
-    if (s.answerRequirement.trim()) lines.push(section('作答要求', s.answerRequirement))
-    if (s.rubric.trim()) lines.push(section('评分标准（评分细则）', s.rubric))
     if (s.referenceAnswer.trim()) lines.push(section('参考答案', s.referenceAnswer))
-    const sample = s.sampleAnswer.trim()
-    if (sample || ctx.sampleImageCount > 0) {
-      lines.push(section('示例参考', `${sample}${ctx.sampleImageCount > 0 ? `\n（另附 ${ctx.sampleImageCount} 张参考图片）` : ''}`))
-    }
+    if (s.rubric.trim()) lines.push(section('评分标准', s.rubric))
+  }
+  if (ctx.embeddedImageCount > 0) {
+    lines.push(`\n（另附 ${ctx.embeddedImageCount} 张题目相关原图，请结合图片内容评分）\n`)
   }
   return lines.filter(Boolean).join('\n')
 }

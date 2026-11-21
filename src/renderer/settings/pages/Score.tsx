@@ -4,7 +4,7 @@ import { useConfigStore } from '@renderer/stores/config'
 
 const { Text, Title, Paragraph } = Typography
 
-/** 分值配置：整题总分 / 允许打分范围 / 步长精度 */
+/** 分值配置：总分值 / 打分步长（打分范围固定为 0～总分） */
 export default function ScorePage() {
   const { config, patch } = useConfigStore()
   const { message } = AntdApp.useApp()
@@ -12,7 +12,9 @@ export default function ScorePage() {
   const sc = config.scoreConfig
 
   const save = (p: Partial<ScoreConfig>) => {
-    const next = { ...sc, ...p }
+    // 最低分 / 最高分已从界面移除：范围固定为 0～总分，避免旧配置残留影响打分
+    const next: ScoreConfig = { ...sc, ...p, min: 0, max: Math.max(0, sc.total) }
+    if (p.total !== undefined) next.max = Math.max(0, p.total)
     const payload: Record<string, unknown> = { scoreConfig: next }
     // 总分值变化时同步平均分配到各小题（每题满分 = 总分值 ÷ 题数，0.5 步进取整）
     if (p.total !== undefined) {
@@ -38,7 +40,7 @@ export default function ScorePage() {
         分值配置
       </Title>
       <Paragraph className="page-desc">
-        总分值 / 打分范围 / 步长；AI 给分自动对齐步长并夹取到范围。
+        总分值与打分步长；打分范围固定为 0～总分，AI 给分自动对齐步长。
       </Paragraph>
 
       <Card styles={{ body: { padding: 14 } }}>
@@ -49,30 +51,6 @@ export default function ScorePage() {
               value={sc.total}
               onChange={(v) => save({ total: Number(v) || 0 })}
               min={0.5}
-              max={1000}
-              step={0.5}
-              addonAfter="分"
-              style={{ width: '100%' }}
-            />
-          </Col>
-          <Col span={12}>
-            <Text {...fieldLabel}>最低分</Text>
-            <InputNumber
-              value={sc.min}
-              onChange={(v) => save({ min: Number(v) || 0 })}
-              min={0}
-              max={sc.max}
-              step={0.5}
-              addonAfter="分"
-              style={{ width: '100%' }}
-            />
-          </Col>
-          <Col span={12}>
-            <Text {...fieldLabel}>最高分</Text>
-            <InputNumber
-              value={sc.max}
-              onChange={(v) => save({ max: Number(v) || sc.total })}
-              min={sc.min}
               max={1000}
               step={0.5}
               addonAfter="分"

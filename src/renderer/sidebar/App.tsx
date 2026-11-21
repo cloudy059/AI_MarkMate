@@ -33,8 +33,8 @@ import {
   PauseCircleOutlined,
   PlayCircleOutlined,
   RightOutlined,
+  SaveOutlined,
   SelectOutlined,
-  SettingOutlined,
   StopOutlined,
   UploadOutlined
 } from '@ant-design/icons'
@@ -42,7 +42,13 @@ import type { GradingState, WorkflowConfig } from '@shared/types'
 import { useConfigStore } from '@renderer/stores/config'
 import { useGradingStore } from '@renderer/stores/grading'
 import { Markdown } from '@renderer/components/Markdown'
-import { SETTINGS_PAGES, normalizeSettingsPage, settingsPageByKey } from '@renderer/settings/pages'
+import {
+  DEFAULT_SETTINGS_PAGE,
+  ensureSettingsPage,
+  normalizeSettingsPage,
+  settingsPageByKey
+} from '@renderer/settings/pages'
+import GeneralSettings from '@renderer/settings/pages/General'
 import { GRADING_MODE_DESC } from '@renderer/settings/pages/Workflow'
 import Hint from '@renderer/settings/Hint'
 import { unwrap } from '@renderer/utils'
@@ -68,7 +74,7 @@ const STATE_INFO: Record<GradingState, { label: string; color: string }> = {
   paused_error: { label: '异常暂停', color: 'error' }
 }
 
-/** 悬浮侧边栏：批改控制台（状态/倒计时/四模式/仲裁/人工兜底/统计/设置入口）+ 集成设置视图 */
+/** 悬浮侧边栏：批改控制台（状态/倒计时/四模式/仲裁/人工兜底/统计/前期设置/通用设置）+ 集成设置视图 */
 export default function SidebarApp() {
   const { config, load, patch } = useConfigStore()
   const g = useGradingStore()
@@ -84,23 +90,28 @@ export default function SidebarApp() {
       localStorage.setItem('setup-collapsed', v ? '0' : '1')
       return !v
     })
+  // 通用设置卡片：默认收起（状态跨会话持久化）
+  const [generalCollapsed, setGeneralCollapsed] = useState<boolean>(
+    () => localStorage.getItem('general-collapsed') !== '0'
+  )
+  const toggleGeneral = () =>
+    setGeneralCollapsed((v) => {
+      localStorage.setItem('general-collapsed', v ? '0' : '1')
+      return !v
+    })
   // 仲裁偏向统计：人工仲裁分更接近哪个模型就给哪方 +1；某方领先 ≥2 次后，建议值改为该模型分数
   const arbBiasRef = useRef<{ A: number; B: number }>({ A: 0, B: 0 })
-  // 设置视图：showSettings=是否在设置视图；page=null 为设置菜单，否则为具体设置页 key
+  // 设置视图：showSettings=是否在设置视图；page 始终指向一个具体设置页（无菜单列表）
   const [showSettings, setShowSettings] = useState(false)
-  const [page, setPage] = useState<string | null>(null)
+  const [page, setPage] = useState<string>(DEFAULT_SETTINGS_PAGE)
 
-  const openSettingsMenu = () => {
-    setShowSettings(true)
-    setPage(null)
-  }
   const openSettingsPage = (p: string) => {
     setShowSettings(true)
-    setPage(normalizeSettingsPage(p))
+    setPage(ensureSettingsPage(normalizeSettingsPage(p)))
   }
   const exitSettings = () => {
     setShowSettings(false)
-    setPage(null)
+    setPage(DEFAULT_SETTINGS_PAGE)
   }
 
   useEffect(() => {
@@ -108,11 +119,11 @@ export default function SidebarApp() {
     useGradingStore.getState().init()
   }, [load])
 
-  // 主进程 openSettings() → 唤起侧边栏并导航到对应设置页（空串=设置菜单；旧键自动映射到合并页分区）
+  // 主进程 openSettings() → 唤起侧边栏并导航到对应设置页（空串=默认页；旧键自动映射到合并页分区）
   useEffect(() => {
     const off = window.api.onNavigate((p) => {
       setShowSettings(true)
-      setPage(p ? normalizeSettingsPage(p) : null)
+      setPage(p ? ensureSettingsPage(normalizeSettingsPage(p)) : DEFAULT_SETTINGS_PAGE)
     })
     return off
   }, [])
@@ -202,6 +213,19 @@ export default function SidebarApp() {
     }
   }
 
+  /** 通用设置卡片：配置导入 / 导出 */
+  const importConfig = async () => {
+    const r = await window.api.importConfig()
+    if (r) {
+      await load()
+      void message.success('配置导入成功')
+    }
+  }
+  const exportConfig = async () => {
+    const r = await window.api.exportConfig()
+    if (r) void message.success(`配置已导出至：${r}`)
+  }
+
   const info = STATE_INFO[g.state] ?? STATE_INFO.idle
 
   return (
@@ -215,13 +239,6 @@ export default function SidebarApp() {
         )}
         <button
           className="bar-btn"
-          title={showSettings ? '设置菜单' : '打开设置'}
-          onClick={openSettingsMenu}
-        >
-          <SettingOutlined />
-        </button>
-        <button
-          className="bar-btn"
           title="隐藏侧边栏（快捷键呼出）"
           onClick={() => window.api.toggleSidebar()}
         >
@@ -230,7 +247,7 @@ export default function SidebarApp() {
       </div>
 
       {showSettings ? (
-        <SettingsView page={page} onBack={() => setPage(null)} onExit={exitSettings} onNavigate={openSettingsPage} />
+        <SettingsView page={page} onExit={exitSettings} onNavigate={openSettingsPage} />
       ) : (
       <div className="panel-body">
         {/* 状态卡片：body 最小高度固定，避免状态切换时卡片高度跳动 */}
@@ -558,14 +575,18 @@ export default function SidebarApp() {
                 />
               )}
               {g.lastRecord.subScores.length > 0 && (
-                <div>
+                <div className="sub-score-grid">
                   {g.lastRecord.subScores.map((s, i) => (
-                    <div key={`${s.subId}-${i}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                      <Text>{s.name}</Text>
-                      <Text>
+                    <div
+                      className="sub-score-chip"
+                      key={`${s.subId}-${i}`}
+                      title={`${s.name}：${typeof s.finalScore === 'number' ? `${s.finalScore} 分` : '未给分'}${s.arbited ? '（仲裁）' : ''}`}
+                    >
+                      <span className="sub-score-name">{s.name}</span>
+                      <span className="sub-score-value">
                         {typeof s.finalScore === 'number' ? `${s.finalScore} 分` : '未给分'}
-                        {s.arbited && <Tag color="orange" style={{ marginLeft: 4 }}>仲裁</Tag>}
-                      </Text>
+                      </span>
+                      {s.arbited && <span className="sub-score-arbit" title="该小题分数由仲裁产生">仲</span>}
                     </div>
                   ))}
                 </div>
@@ -648,6 +669,38 @@ export default function SidebarApp() {
           </Card>
         )}
 
+        {/* 通用设置：默认收起，收纳前期设置之外的全部功能 */}
+        <Card
+          size="small"
+          style={{ marginTop: 8 }}
+          title={
+            <span onClick={toggleGeneral} style={{ cursor: 'pointer', userSelect: 'none' }}>
+              {generalCollapsed ? <RightOutlined /> : <DownOutlined />} 通用设置
+            </span>
+          }
+          styles={{ body: { padding: generalCollapsed ? 0 : '8px 10px' } }}
+        >
+          {!generalCollapsed && (
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <div className="setup-links">
+                <Button icon={<SaveOutlined />} onClick={() => openSettingsPage('presets')}>
+                  预设方案
+                </Button>
+                <Button icon={<FileTextOutlined />} onClick={() => openSettingsPage('logs')}>
+                  批改日志
+                </Button>
+                <Button icon={<DownloadOutlined />} onClick={() => void exportConfig()}>
+                  导出配置
+                </Button>
+                <Button icon={<UploadOutlined />} onClick={() => void importConfig()}>
+                  导入配置
+                </Button>
+              </div>
+              <GeneralSettings />
+            </Space>
+          )}
+        </Card>
+
         <Divider style={{ margin: '4px 0' }} />
         <Text type="secondary" style={{ fontSize: 11, textAlign: 'center', display: 'block' }}>
           快捷键 {config?.settings.hotkeyToggle ?? '-'} 呼出/隐藏 · 拖动顶栏移动位置
@@ -694,76 +747,36 @@ export default function SidebarApp() {
   )
 }
 
-/** 设置视图：设置菜单列表 + 各设置详情页（集成在侧边栏内，复用 settings/pages 组件库） */
+/** 设置视图：仅作为主界面各入口的目标页，顶部只保留返回控制台与当前页标题 */
 function SettingsView({
   page,
-  onBack,
   onExit,
   onNavigate
 }: {
-  page: string | null
-  onBack: () => void
+  page: string
   onExit: () => void
   onNavigate: (p: string) => void
 }) {
-  const { config, load } = useConfigStore()
-  const { message } = AntdApp.useApp()
-  const def = page ? settingsPageByKey(page) : undefined
-
-  const doImport = async () => {
-    const r = await window.api.importConfig()
-    if (r) {
-      await load()
-      void message.success('配置导入成功')
-    }
-  }
-  const doExport = async () => {
-    const r = await window.api.exportConfig()
-    if (r) void message.success(`配置已导出至：${r}`)
-  }
+  const { config } = useConfigStore()
+  const def = settingsPageByKey(page)
 
   return (
     <>
       <div className="settings-nav">
-        <Button type="text" size="small" icon={<LeftOutlined />} onClick={page ? onBack : onExit}>
-          {page ? '设置' : '控制台'}
+        <Button type="text" size="small" icon={<LeftOutlined />} onClick={onExit}>
+          控制台
         </Button>
         <Text strong ellipsis style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13 }}>
-          {page && def ? def.label : '设置'}
+          {def?.label ?? '设置'}
         </Text>
         <span style={{ width: 52, flex: 'none' }} />
       </div>
 
       <div className="settings-body">
-        {!page ? (
-          <>
-            <div className="settings-menu">
-              {SETTINGS_PAGES.map((p) => (
-                <button key={p.key} className="settings-menu-item" onClick={() => onNavigate(p.key)}>
-                  <span className="mi-icon">{p.icon}</span>
-                  <span className="mi-text">
-                    <span className="mi-label">{p.label}</span>
-                    <span className="mi-desc">{p.desc}</span>
-                  </span>
-                  <RightOutlined className="mi-arrow" />
-                </button>
-              ))}
-            </div>
-            <div className="settings-io">
-              <Button size="small" block icon={<DownloadOutlined />} onClick={() => void doExport()}>
-                导出配置
-              </Button>
-              <Button size="small" block icon={<UploadOutlined />} onClick={() => void doImport()}>
-                导入配置
-              </Button>
-            </div>
-          </>
+        {!config ? (
+          <Empty description="配置加载中…" style={{ marginTop: 60 }} />
         ) : def ? (
-          config ? (
-            def.render(onNavigate, page ?? '')
-          ) : (
-            <Empty description="配置加载中…" style={{ marginTop: 60 }} />
-          )
+          def.render(onNavigate, page)
         ) : null}
       </div>
     </>

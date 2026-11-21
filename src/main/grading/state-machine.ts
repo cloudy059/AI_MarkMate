@@ -315,7 +315,7 @@ class GradingEngine {
       return '尚未标记分值输入框位置：请到「答题区域」页点击标记'
     }
     const std = cfg.scoringStandards[cfg.activeStandardIndex]
-    if (!isStandardUsable(std)) return '当前启用的评分标准为空：请先在「评分标准」页填写内容'
+    if (!isStandardUsable(std)) return '当前启用的评分标准为空：请先在「评分标准」页填写题目题干 / 参考答案 / 评分标准'
     try {
       resolveProviderRef(cfg.workflow.roles.grader, cfg.workflow.mode === 'A' ? 'vision' : 'chat')
     } catch (err) {

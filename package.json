@@ -1,7 +1,7 @@
 {
   "name": "ai-grading-assistant",
   "productName": "AI自动阅卷助手",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "AI自动阅卷桌面侧边栏助手 —— 悬浮侧边栏形式的智能阅卷打分工具",
   "main": "out/main/index.js",
   "author": "AI Grading Assistant",
@@ -26,6 +26,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/turndown": "^5.0.6",
     "@vitejs/plugin-react": "^5.2.0",
     "antd": "^6.6.6",
     "electron": "^44.7.2",
@@ -36,7 +37,10 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "turndown": "^7.2.1",
+    "turndown-plugin-gfm": "^1.0.2",
     "typescript": "~5.9.0",
     "vite": "^7.1.0",
     "zustand": "^5.0.15"

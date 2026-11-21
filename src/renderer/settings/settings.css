@@ -78,6 +78,33 @@
   max-height: 520px;
 }
 
+/* 三字段卡片预览：点击打开独立编辑窗口 */
+.std-field-preview {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  max-height: 168px;
+  overflow: auto;
+  min-height: 62px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.std-field-preview:hover,
+.std-field-preview:focus-visible {
+  border-color: #91caff;
+  background: #f4f9ff;
+  outline: none;
+}
+
+.std-field-placeholder {
+  color: #bfbfbf;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
 .std-img-thumb {
   position: relative;
   width: 96px;

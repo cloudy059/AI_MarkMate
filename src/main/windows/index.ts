@@ -7,10 +7,13 @@ import {
   type GradingEvent,
   type Rect,
   type Region,
-  type RegionKind
+  type RegionKind,
+  type RichTextInitPayload,
+  type RichTextResultPayload
 } from '@shared/types'
 import { configStore } from '@main/services/config-store'
 import { automation } from '@main/services/automation'
+import { attachRichTextContextMenu } from '@main/windows/rich-text-menu'
 
 // ============================================================
 // 窗口管理：侧边栏（含设置视图）/ 全屏标记 Overlay
@@ -132,7 +135,7 @@ export function toggleSidebar(force?: 'show' | 'hide'): void {
 
 /**
  * 唤起侧边栏并切换到设置视图。
- * page 为空时进入设置菜单；传具体 key（如 'providers'）直达对应设置页。
+ * page 为空时渲染层直达默认设置页；传具体 key（如 'providers'）直达对应设置页。
  */
 export function openSettings(page?: string): void {
   let win = sidebarWindow
@@ -195,6 +198,85 @@ export function openCorrectionSession(payload: CorrectionInitPayload): void {
 export function closeCorrectionWindow(): void {
   if (correctionWindow && !correctionWindow.isDestroyed()) correctionWindow.close()
   correctionWindow = null
+}
+
+// ---------------- 独立富文本编辑窗口 ----------------
+
+let richTextWindow: BrowserWindow | null = null
+let richTextSession: { payload: RichTextInitPayload; requester: Electron.WebContents } | null = null
+
+/** 回传编辑结果给发起窗口；value 为 null 表示取消 */
+function finishRichText(value: string | null, closeWindow: boolean): void {
+  const s = richTextSession
+  richTextSession = null
+  if (s && !s.requester.isDestroyed()) {
+    const result: RichTextResultPayload = { token: s.payload.token, value }
+    s.requester.send(IPC.RichTextResult, result)
+  }
+  if (closeWindow && richTextWindow && !richTextWindow.isDestroyed()) richTextWindow.close()
+}
+
+/**
+ * 打开屏幕居中的独立富文本编辑窗口（不受侧边栏尺寸限制）。
+ * 已存在时复用窗口；窗口被直接关闭时按「取消」回传，避免发起方一直等待。
+ */
+export function openRichTextEditor(requester: Electron.WebContents, payload: RichTextInitPayload): void {
+  richTextSession = { payload, requester }
+  let win = richTextWindow
+  if (!win || win.isDestroyed()) {
+    const created = new BrowserWindow({
+      width: 1080,
+      height: 740,
+      minWidth: 820,
+      minHeight: 560,
+      resizable: true,
+      alwaysOnTop: true,
+      skipTaskbar: false,
+      fullscreenable: false,
+      autoHideMenuBar: true,
+      icon: winIcon(),
+      title: payload.title,
+      webPreferences: webPrefs(),
+      show: false
+    })
+    created.setAlwaysOnTop(true, 'screen-saver')
+    created.center()
+    attachRichTextContextMenu(created)
+    loadRenderer(created, 'richtext')
+    created.once('ready-to-show', () => {
+      if (!created.isDestroyed()) {
+        created.show()
+        created.focus()
+      }
+    })
+    created.on('closed', () => {
+      richTextWindow = null
+      finishRichText(null, false)
+    })
+    richTextWindow = created
+    win = created
+  } else {
+    win.setTitle(payload.title)
+    if (!win.isVisible()) win.show()
+    win.focus()
+  }
+  if (!win) return
+  const target = win
+  const send = () => {
+    if (!target.isDestroyed()) target.webContents.send(IPC.RichTextInit, payload)
+  }
+  if (target.webContents.isLoading()) target.webContents.once('did-finish-load', send)
+  else send()
+}
+
+/** 编辑器点「保存」：把 Markdown 回传并关闭窗口 */
+export function submitRichText(markdown: string): void {
+  finishRichText(markdown, true)
+}
+
+/** 编辑器点「取消」/ 关闭按钮 */
+export function cancelRichText(): void {
+  finishRichText(null, true)
 }
 
 // ---------------- 标记 Overlay ----------------

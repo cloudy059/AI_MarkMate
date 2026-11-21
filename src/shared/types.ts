@@ -145,39 +145,47 @@ export interface ScoreConfig {
   step: number
 }
 
-// ---------- 评分标准（4+1 子页） ----------
+// ---------- 评分标准（题目题干 / 参考答案 / 评分标准） ----------
 export interface ScoringStandard {
   id: string
   name: string
   subject: string
   grade: string
   questionType: string
-  /** 评分标准 */
-  rubric: string
   /** 题目题干 */
   questionStem: string
   /** 参考答案 */
   referenceAnswer: string
-  /** 作答要求 */
-  answerRequirement: string
-  /** 示例参考（文字部分） */
-  sampleAnswer: string
-  /** 示例参考图片（userData 相对路径） */
-  sampleImages: string[]
+  /** 评分标准 */
+  rubric: string
   enabled: boolean
 }
 
-/** 4+1 子页中任意子页含文字或图片即可批改 */
+/**
+ * 配置迁移：旧版评分标准含「作答要求 / 示例参考（文字与图片）」字段，
+ * 读取时统一丢弃这些已下线字段，并补齐三个现有字段的默认值。
+ */
+export function normalizeScoringStandard(raw: unknown, index = 0): ScoringStandard | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as Record<string, unknown>
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+  return {
+    id: str(s.id) || `std_legacy_${index}`,
+    name: str(s.name),
+    subject: str(s.subject),
+    grade: str(s.grade),
+    questionType: str(s.questionType),
+    questionStem: str(s.questionStem),
+    referenceAnswer: str(s.referenceAnswer),
+    rubric: str(s.rubric),
+    enabled: Boolean(s.enabled)
+  }
+}
+
+/** 三个字段中任意一项含内容即可批改 */
 export function isStandardUsable(s: ScoringStandard | null): boolean {
   if (!s) return false
-  return Boolean(
-    s.rubric.trim() ||
-      s.questionStem.trim() ||
-      s.referenceAnswer.trim() ||
-      s.answerRequirement.trim() ||
-      s.sampleAnswer.trim() ||
-      s.sampleImages.length > 0
-  )
+  return Boolean(s.questionStem.trim() || s.referenceAnswer.trim() || s.rubric.trim())
 }
 
 // ---------- 预设方案 ----------
@@ -381,6 +389,34 @@ export interface CorrectionApplyPayload {
   standardUpdates?: { referenceAnswer?: string; rubric?: string } | null
 }
 
+// ---------- 独立富文本编辑窗口 ----------
+/** 打开独立编辑器时的初始化数据（主进程 → 编辑器窗口） */
+export interface RichTextInitPayload {
+  /** 本次编辑的唯一标识，结果回传时原样带回 */
+  token: string
+  title: string
+  /** Markdown 原文 */
+  value: string
+  /** 当前评分标准套 id，用于导入图片存放目录 */
+  standardId: string
+  placeholder?: string
+}
+
+/** 编辑结果回传（value 为 null 表示取消或窗口被直接关闭） */
+export interface RichTextResultPayload {
+  token: string
+  value: string | null
+}
+
+/**
+ * 右键菜单粘贴指令（主进程 → 编辑器窗口）：
+ * 文本直接插入；截图可选择「AI 识别并粘贴（仅文字，不附原图）」或「仅粘贴图片」。
+ */
+export type RichTextPastePayload =
+  | { kind: 'text'; text: string }
+  | { kind: 'ocr'; dataUrl: string }
+  | { kind: 'image'; dataUrl: string }
+
 // ---------- IPC 通道名 ----------
 export const IPC = {
   // 配置
@@ -425,7 +461,7 @@ export const IPC = {
   StandardImageLoad: 'standard:imageLoad',
   StandardImageSave: 'standard:imageSave',
   // AI 生成
-  AiGenerateRubric: 'ai:generateRubric',
+  AiGenerateStandard: 'ai:generateStandard',
   AiImageToMarkdown: 'ai:imageToMarkdown',
   // 剪贴板
   ClipboardReadImage: 'clipboard:readImage',
@@ -441,7 +477,15 @@ export const IPC = {
   CorrectionStream: 'correction:stream',
   CorrectionAnalyze: 'correction:analyze',
   CorrectionPolish: 'correction:polish',
-  CorrectionClose: 'correction:close'
+  CorrectionClose: 'correction:close',
+  // 独立富文本编辑窗口
+  RichTextOpen: 'richtext:open',
+  RichTextInit: 'richtext:init',
+  RichTextSubmit: 'richtext:submit',
+  RichTextCancel: 'richtext:cancel',
+  RichTextResult: 'richtext:result',
+  /** 右键菜单选中的粘贴内容 */
+  RichTextPaste: 'richtext:paste'
 } as const
 
 /** 深度部分类型（patch 配置用；数组整体替换） */
@@ -454,14 +498,13 @@ export interface AiChatMessagePart {
   text: string
 }
 
-/** 生成评分细则请求 */
-export interface GenerateRubricRequest {
-  grade: string // 年段
-  subject: string // 学科
-  questionType: string // 题型
+/** AI 生成评分标准请求：题干与参考答案取自当前已编辑的评分标准套 */
+export interface GenerateStandardRequest {
+  /** 满分取全局分值配置 */
+  totalScore: number
   questionStem: string
   referenceAnswer: string
-  totalScore: number
+  /** 生成时追加的补充要求（可选） */
   extraRequirement?: string
 }
 

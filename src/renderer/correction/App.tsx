@@ -322,11 +322,15 @@ export default function CorrectionApp() {
                             key: 'subs',
                             label: '各小题',
                             children: (
-                              <div className="sub-score-list">
+                              <div className="sub-score-grid">
                                 {record.subScores.map((s, i) => (
-                                  <div key={`${s.subId}-${i}`} className="sub-score-row">
-                                    <Text style={{ fontSize: 12 }}>{s.name}</Text>
-                                    <Text strong style={{ fontSize: 12 }}>{s.finalScore ?? '-'} 分</Text>
+                                  <div
+                                    className="sub-score-chip"
+                                    key={`${s.subId}-${i}`}
+                                    title={`${s.name}：${s.finalScore ?? '-'} 分`}
+                                  >
+                                    <span className="sub-score-name">{s.name}</span>
+                                    <span className="sub-score-value">{s.finalScore ?? '-'} 分</span>
                                   </div>
                                 ))}
                               </div>
@@ -360,15 +364,15 @@ export default function CorrectionApp() {
               <Card size="small" title="教师反馈" styles={{ body: { padding: '8px 12px' } }}>
                 <Space direction="vertical" size={8} style={{ width: '100%' }}>
                   {multi ? (
-                    <>
+                    <div className="sub-input-grid">
                       {subs.map((sq, i) => (
-                        <div key={sq.id} className="sub-score-row" style={{ gap: 8 }}>
-                          <Text style={{ fontSize: 12, flex: 1 }}>
-                            {sq.name}
-                            <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                        <div key={sq.id} className="sub-input-cell" title={`${sq.name}（满分 ${sq.maxScore}）`}>
+                          <div className="sub-input-label">
+                            <span>{sq.name}</span>
+                            <Text type="secondary" style={{ fontSize: 11 }}>
                               （满分 {sq.maxScore}）
                             </Text>
-                          </Text>
+                          </div>
                           <InputNumber
                             size="small"
                             value={teacherScores[i]}
@@ -382,12 +386,12 @@ export default function CorrectionApp() {
                             max={sq.maxScore}
                             step={scoreCfg.step || 1}
                             precision={2}
-                            style={{ width: 110 }}
+                            style={{ width: '100%' }}
                             addonAfter="分"
                           />
                         </div>
                       ))}
-                      <div className="sub-score-row" style={{ gap: 8 }}>
+                      <div className="sub-total-row">
                         <Text style={{ fontSize: 12, flex: 1 }}>
                           总分
                           <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
@@ -405,11 +409,11 @@ export default function CorrectionApp() {
                           max={scoreCfg.max}
                           step={scoreCfg.step || 1}
                           precision={2}
-                          style={{ width: 90 }}
+                          style={{ width: 110 }}
                           addonAfter="分"
                         />
                       </div>
-                    </>
+                    </div>
                   ) : (
                     <div className="sub-score-row" style={{ gap: 8 }}>
                       <Text style={{ fontSize: 12, flex: 1 }}>正确得分</Text>
@@ -557,7 +561,7 @@ export default function CorrectionApp() {
                 返回修改
               </Button>
               <Text type="secondary" style={{ fontSize: 11 }}>
-                确认更新后将自动写入当前评分标准的参考答案与评分细则，后续批改即生效
+                确认更新后将自动写入当前评分标准的参考答案与评分标准，后续批改即生效
               </Text>
             </Space>
           </div>

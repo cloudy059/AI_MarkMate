@@ -1,0 +1,104 @@
+/* ============================================================
+   独立富文本编辑窗口：整页布局（窗口由主进程居中创建）
+   ============================================================ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f5f6f8;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+.rte-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rte-window {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rte-window-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rte-window-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.rte-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rte-window .rte-topbar {
+  flex: none;
+}
+
+.rte-window .rte-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rte-window .rte-surface,
+.rte-window .rte-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+}
+
+.rte-window .rte-source-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+}
+
+.rte-window .rte-source {
+  height: 100%;
+}
+
+.rte-window .rte-source textarea {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none;
+  resize: none;
+}
+
+.rte-window .rte-live-preview {
+  max-height: none;
+  height: 100%;
+}
+
+.rte-window .rte-footer {
+  flex: none;
+  padding: 2px 0 0;
+}

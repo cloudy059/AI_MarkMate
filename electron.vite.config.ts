@@ -44,7 +44,8 @@ export default defineConfig({
         input: {
           sidebar: resolve('src/renderer/sidebar/index.html'),
           overlay: resolve('src/renderer/overlay/index.html'),
-          correction: resolve('src/renderer/correction/index.html')
+          correction: resolve('src/renderer/correction/index.html'),
+          richtext: resolve('src/renderer/richtext/index.html')
         }
       }
     }

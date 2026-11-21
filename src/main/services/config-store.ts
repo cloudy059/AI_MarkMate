@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import { CURRENT_CONFIG_VERSION, type AppConfig } from '@shared/types'
+import { CURRENT_CONFIG_VERSION, normalizeScoringStandard, type AppConfig } from '@shared/types'
 import { defaultConfig } from '@main/ai/registry'
 
 export type DeepPartial<T> = {
@@ -24,6 +24,14 @@ function deepMerge<T>(base: T, patch: unknown): T {
   return result as T
 }
 
+/** 最低分 / 最高分输入框已移除：打分范围固定为 0～总分，兼容旧配置残留值 */
+function normalizeScoreRange(cfg: AppConfig): void {
+  if (!cfg.scoreConfig) return
+  const total = Number(cfg.scoreConfig.total)
+  cfg.scoreConfig.min = 0
+  cfg.scoreConfig.max = Number.isFinite(total) ? Math.max(0, total) : 0
+}
+
 class ConfigStore {
   private data!: AppConfig
   private filePath = ''
@@ -33,6 +41,7 @@ class ConfigStore {
     const dir = app.getPath('userData')
     this.filePath = path.join(dir, 'config.json')
     this.data = this.load()
+    normalizeScoreRange(this.data)
   }
 
   private load(): AppConfig {
@@ -60,9 +69,10 @@ class ConfigStore {
           const n = PROVIDER_NAME_MIGRATION[p.name]
           if (n) p.name = n
         }
-        // 保证评分标准定长 10
+        // 保证评分标准定长 10，并清除旧版「作答要求 / 示例参考」字段
         while (merged.scoringStandards.length < 10) merged.scoringStandards.push(null)
         merged.scoringStandards.length = 10
+        merged.scoringStandards = merged.scoringStandards.map(normalizeScoringStandard)
         merged.activeStandardIndex = Math.min(Math.max(merged.activeStandardIndex, 0), 9)
         return merged
       }
@@ -99,6 +109,8 @@ class ConfigStore {
     } else {
       this.data = deepMerge(this.data, partial)
     }
+    this.data.scoringStandards = this.data.scoringStandards.map(normalizeScoringStandard)
+    normalizeScoreRange(this.data)
     this.scheduleSave()
     return this.data
   }
@@ -109,6 +121,8 @@ class ConfigStore {
     this.data.version = CURRENT_CONFIG_VERSION
     while (this.data.scoringStandards.length < 10) this.data.scoringStandards.push(null)
     this.data.scoringStandards.length = 10
+    this.data.scoringStandards = this.data.scoringStandards.map(normalizeScoringStandard)
+    normalizeScoreRange(this.data)
     this.scheduleSave()
     return this.data
   }

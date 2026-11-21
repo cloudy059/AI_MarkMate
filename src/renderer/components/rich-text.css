@@ -1,0 +1,259 @@
+/* ============================================================
+   弹窗式富文本编辑器（可视化 / 源码 / 预览）
+   ============================================================ */
+
+.rte-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rte-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 8px 8px;
+  border: 1px solid #e8e8e8;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #fafafa;
+}
+
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1px;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.rte-toolbar .ant-btn {
+  padding-inline: 5px;
+  color: #444;
+}
+
+.rte-toolbar .ant-btn:disabled {
+  color: #bfbfbf;
+}
+
+.rte-caret {
+  font-size: 10px;
+  color: #8c8c8c;
+}
+
+.rte-sep {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: #d9d9d9;
+  flex: none;
+}
+
+.rte-stage {
+  border: 1px solid #e8e8e8;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* ---------- 可视化编辑区 ---------- */
+.rte-surface {
+  min-height: 330px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding: 14px 16px;
+  outline: none;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #1f1f1f;
+  word-break: break-word;
+}
+
+.rte-surface:empty::before {
+  content: attr(data-placeholder);
+  color: #bfbfbf;
+}
+
+.rte-surface:focus {
+  box-shadow: inset 0 0 0 2px rgba(22, 119, 255, 0.12);
+}
+
+.rte-surface p {
+  margin: 0 0 8px;
+}
+
+.rte-surface h1 { font-size: 20px; margin: 14px 0 8px; }
+.rte-surface h2 { font-size: 17px; margin: 12px 0 7px; }
+.rte-surface h3 { font-size: 15px; margin: 10px 0 5px; }
+.rte-surface h4,
+.rte-surface h5,
+.rte-surface h6 { font-size: 14px; margin: 8px 0 4px; }
+
+.rte-surface ul,
+.rte-surface ol {
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+
+.rte-surface li { margin-bottom: 3px; }
+
+.rte-surface blockquote {
+  margin: 8px 0;
+  padding: 4px 10px;
+  border-left: 3px solid #d9d9d9;
+  color: #595959;
+  background: #fafafa;
+}
+
+.rte-surface code {
+  background: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+.rte-surface pre {
+  background: #f7f7f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 10px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.rte-surface pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.rte-surface table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: auto;
+  min-width: 60%;
+}
+
+.rte-surface th,
+.rte-surface td {
+  border: 1px solid #d9d9d9;
+  padding: 4px 9px;
+  min-width: 48px;
+}
+
+.rte-surface th {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.rte-surface hr {
+  border: none;
+  border-top: 1px solid #e8e8e8;
+  margin: 12px 0;
+}
+
+.rte-surface img {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+}
+
+.rte-surface a {
+  color: #1677ff;
+}
+
+.rte-surface .katex-display {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+.rte-surface .rte-math {
+  display: inline-block;
+  cursor: default;
+  user-select: none;
+}
+
+.rte-surface .contains-task-list {
+  list-style: none;
+  padding-left: 8px;
+}
+
+.rte-surface input[type='checkbox'] {
+  margin-right: 6px;
+}
+
+/* ---------- 源码 + 实时预览 ---------- */
+.rte-source-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.rte-source textarea {
+  min-height: 330px !important;
+  max-height: calc(100vh - 260px);
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 14px 16px !important;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.rte-live-preview {
+  min-height: 180px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding: 12px 16px;
+  border-top: 1px dashed #e8e8e8;
+  background: #fcfcfc;
+}
+
+.rte-live-label {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-bottom: 6px;
+  letter-spacing: 0.4px;
+}
+
+@media (min-width: 900px) {
+  .rte-source-wrap {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .rte-live-preview {
+    border-top: none;
+    border-left: 1px dashed #e8e8e8;
+  }
+}
+
+/* ---------- 预览 / 公式预览 ---------- */
+.rte-preview {
+  min-height: 330px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding: 14px 16px;
+  background: #fafafa;
+}
+
+.rte-formula-preview {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fafafa;
+  padding: 8px 10px;
+  max-height: 140px;
+  overflow: auto;
+}
+
+/* ---------- 窄容器（侧边栏）适配 ---------- */
+@media (max-width: 620px) {
+  .rte-topbar { flex-direction: column; }
+  .rte-toolbar { flex: 1 1 100%; }
+  .rte-surface { min-height: 260px; }
+  .rte-footer { flex-direction: column; align-items: flex-start; }
+}

@@ -1,12 +1,4 @@
 import type { ReactNode } from 'react'
-import {
-  AuditOutlined,
-  CloudServerOutlined,
-  FileTextOutlined,
-  RocketOutlined,
-  SaveOutlined
-} from '@ant-design/icons'
-import OnboardingPage from './Onboarding'
 import { ModelsPage, MarkingPage } from './Merged'
 import PresetsPage from './Presets'
 import LogsPage from './Logs'
@@ -14,49 +6,35 @@ import LogsPage from './Logs'
 export interface SettingsPageDef {
   key: string
   label: string
-  desc: string
-  icon: ReactNode
   render: (go: (p: string) => void, page: string) => ReactNode
 }
 
+/** 外部未指定页面时的兜底页（不再经过菜单列表） */
+export const DEFAULT_SETTINGS_PAGE = 'marking:standards'
+
 /**
- * 设置页注册表：侧边栏设置视图按此渲染菜单与详情页。
+ * 设置页注册表：主界面「前期设置 / 通用设置」入口按此打开对应设置页。
  * 合并页支持「key:分区」形式（如 models:providers 直达服务商分区）。
  */
 export const SETTINGS_PAGES: SettingsPageDef[] = [
   {
-    key: 'onboarding',
-    label: '使用引导',
-    desc: '四步上手流程与配置完成度自检',
-    icon: <RocketOutlined />,
-    render: (go) => <OnboardingPage go={go} />
-  },
-  {
     key: 'models',
     label: 'AI 服务商与模型',
-    desc: '服务商接入 / 模型角色 / 全局规则',
-    icon: <CloudServerOutlined />,
     render: (_go, page) => <ModelsPage section={parseSection(page)} />
   },
   {
     key: 'marking',
     label: '评分标准与答题区域',
-    desc: '评分标准 / 分值配置 / 区域标记',
-    icon: <AuditOutlined />,
     render: (_go, page) => <MarkingPage section={parseSection(page)} />
   },
   {
     key: 'presets',
     label: '预设方案',
-    desc: '多套完整配置快照，一键切换',
-    icon: <SaveOutlined />,
     render: () => <PresetsPage />
   },
   {
     key: 'logs',
     label: '批改日志',
-    desc: '全链路识别 / 评分 / 提交数据',
-    icon: <FileTextOutlined />,
     render: () => <LogsPage />
   }
 ]
@@ -81,9 +59,17 @@ export function normalizeSettingsPage(p: string): string {
     case 'sub-questions':
     case 'subs-score':
       return 'marking:regions'
+    // 旧引导页键回落到默认页
+    case 'onboarding':
+      return DEFAULT_SETTINGS_PAGE
     default:
       return p
   }
+}
+
+/** 兜底：未知页键回落到默认页，避免设置视图空白 */
+export function ensureSettingsPage(p: string): string {
+  return settingsPageByKey(p) ? p : DEFAULT_SETTINGS_PAGE
 }
 
 export function settingsPageByKey(key: string): SettingsPageDef | undefined {

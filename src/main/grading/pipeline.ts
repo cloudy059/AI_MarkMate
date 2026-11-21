@@ -30,19 +30,18 @@ export interface GradeOutcome {
   deepThinkNote: string
 }
 
-/** 提取标准文本中嵌入的 stdimg:// 图片相对路径（按出现顺序去重） */
+/** 提取题目题干 / 参考答案 / 评分标准中嵌入的 stdimg:// 图片相对路径（按出现顺序去重） */
 export function extractEmbeddedImages(standard: ScoringStandard | null): string[] {
   if (!standard) return []
-  const fields = [
-    standard.questionStem,
-    standard.referenceAnswer,
-    standard.rubric,
-    standard.answerRequirement,
-    standard.sampleAnswer
-  ]
+  const fields = [standard.questionStem, standard.referenceAnswer, standard.rubric]
   const rels: string[] = []
   for (const f of fields) {
     for (const m of f.matchAll(/!\[[^\]]*\]\(stdimg:\/\/local\/([^)\s]+)\)/g)) {
+      const rel = decodeURIComponent(m[1])
+      if (!rels.includes(rel)) rels.push(rel)
+    }
+    // 兼容富文本编辑器可能残留的 <img src="stdimg://local/..."> 形式
+    for (const m of f.matchAll(/stdimg:\/\/local\/([^"'\s>)]+)/g)) {
       const rel = decodeURIComponent(m[1])
       if (!rels.includes(rel)) rels.push(rel)
     }
@@ -50,11 +49,11 @@ export function extractEmbeddedImages(standard: ScoringStandard | null): string[
   return rels
 }
 
-/** 读取评分标准参考图片：嵌入图（题干图形等）优先，其后为示例参考导入图，共最多 3 张 */
-export function loadSampleImages(standard: ScoringStandard | null): string[] {
+/** 读取三个字段中嵌入的题目原图（最多 3 张） */
+export function loadEmbeddedImages(standard: ScoringStandard | null): string[] {
   if (!standard) return []
   const root = path.join(app.getPath('userData'), 'standards')
-  const rels = [...extractEmbeddedImages(standard), ...(standard.sampleImages ?? [])]
+  const rels = extractEmbeddedImages(standard)
   const out: string[] = []
   for (const rel of rels.slice(0, 3)) {
     try {
@@ -119,22 +118,22 @@ export async function runGrade(opts: {
   const model = think.modelOverride ?? target.model
   const standard = cfg.scoringStandards[cfg.activeStandardIndex] ?? null
   if (!isStandardUsable(standard)) {
-    throw new Error('当前启用的评分标准为空：请在「评分标准」页至少填写一个子页内容')
+    throw new Error('当前启用的评分标准为空：请在「评分标准」页填写题目题干 / 参考答案 / 评分标准')
   }
-  const sampleImages = purpose === 'vision' ? loadSampleImages(standard) : []
+  const embeddedImages = purpose === 'vision' ? loadEmbeddedImages(standard) : []
   const system = buildGradingSystemPrompt({
     standard,
     scoreConfig: cfg.scoreConfig,
     globalRules: cfg.workflow.rulesPrompt,
     subQs,
-    sampleImageCount: sampleImages.length,
+    embeddedImageCount: embeddedImages.length,
     thinkByPrompt: think.note.includes('提示词')
   })
   const user = buildGradingUserPrompt(ocrText, Boolean(answerImage), blankSuspected)
   const imageDataUrls = answerImage
-    ? [answerImage.toDataURL(), ...sampleImages]
-    : sampleImages.length
-      ? sampleImages
+    ? [answerImage.toDataURL(), ...embeddedImages]
+    : embeddedImages.length
+      ? embeddedImages
       : undefined
   const t0 = Date.now()
   const res = await target.adapter.chat({

@@ -177,7 +177,7 @@ export default function PresetsPage() {
       {/* 导入导出 */}
       <Card size="small" style={{ marginTop: 24 }} title="导入 / 导出" styles={{ body: { padding: '8px 16px' } }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          全部配置（含全部预设方案与密钥）可通过侧边栏设置菜单底部的「导出配置 / 导入配置」按钮导出 JSON 或导入，便于在不同电脑之间迁移。
+          全部配置（含全部预设方案与密钥）可通过主界面「通用设置」卡片中的「导出配置 / 导入配置」按钮导出 JSON 或导入，便于在不同电脑之间迁移。
         </Text>
       </Card>
     </div>
